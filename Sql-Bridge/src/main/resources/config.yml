@@ -3,14 +3,14 @@
 # Database configuration
 database:
   # Database type (MYSQL, SQLITE, POSTGRESQL, H2)
-  type: SQLITE
+  type: MYSQL
 
   # MySQL/PostgreSQL settings (ignored for SQLite and H2)
   host: localhost
   port: 3306
   name: minecraft
   username: root
-  password: ""
+  password: "yourpassword"  # Replace with your actual MySQL password
 
 # Connection pool settings
 pool:

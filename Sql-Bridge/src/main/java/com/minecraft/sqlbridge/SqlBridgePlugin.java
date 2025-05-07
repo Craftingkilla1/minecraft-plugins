@@ -240,6 +240,22 @@ public class SqlBridgePlugin extends JavaPlugin {
         String username = config.getString("database.username", "root");
         String password = config.getString("database.password", "");
         
+        // If type is MySQL, make sure we have MySQL specific settings
+        if (type == DatabaseType.MYSQL && 
+                (username == null || username.isEmpty() || password == null)) {
+            enhancedLogger.warning(EnhancedLogger.CONNECTION, 
+                "MySQL configuration is incomplete. Make sure host, port, name, username, and password are set.");
+        }
+        
+        // Add default config value for SQL dialect adaptation
+        if (!config.contains("database.adapt-sql-dialect")) {
+            config.set("database.adapt-sql-dialect", true);
+            saveConfig();
+        }
+        
+        // Log the database type being used
+        enhancedLogger.info(EnhancedLogger.CONNECTION, "Using database type: " + type.name());
+        
         // Create connection manager
         connectionManager = new ConnectionManager(this, type, host, port, database, username, password);
         

@@ -9,6 +9,7 @@ import com.minecraft.sqlbridge.api.Query;
 import com.minecraft.sqlbridge.api.QueryBuilder;
 import com.minecraft.sqlbridge.api.Transaction;
 import com.minecraft.sqlbridge.connection.ConnectionManager;
+import com.minecraft.sqlbridge.dialect.SqlDialectAdapter;
 import com.minecraft.sqlbridge.query.DefaultQueryBuilder;
 import com.minecraft.sqlbridge.query.DefaultQuery;
 import com.minecraft.sqlbridge.stats.QueryStatistics;
@@ -36,6 +37,7 @@ public class DefaultDatabase implements Database, BatchOperations {
     private final ConnectionManager connectionManager;
     private final DefaultDatabaseBatchImpl batchOperations;
     private final int defaultBatchSize = 100;
+    private final boolean adaptSqlDialect;
 
     /**
      * Create a new default database
@@ -48,10 +50,17 @@ public class DefaultDatabase implements Database, BatchOperations {
         this.connectionManager = connectionManager;
         this.batchOperations = new DefaultDatabaseBatchImpl(this, connectionManager, 
                 plugin.getConfig().getInt("batch.size", defaultBatchSize));
+        // Get whether to adapt SQL dialects from config
+        this.adaptSqlDialect = plugin.getConfig().getBoolean("database.adapt-sql-dialect", true);
     }
 
     @Override
     public <T> List<T> query(String sql, Function<Map<String, Object>, T> mapper, Object... params) {
+        // Adapt SQL to current database dialect if enabled
+        if (adaptSqlDialect) {
+            sql = adaptSql(sql);
+        }
+        
         List<T> results = new ArrayList<>();
         
         try (Connection connection = connectionManager.getConnection();
@@ -88,12 +97,22 @@ public class DefaultDatabase implements Database, BatchOperations {
 
     @Override
     public <T> Optional<T> queryFirst(String sql, Function<Map<String, Object>, T> mapper, Object... params) {
+        // Adapt SQL to current database dialect if enabled
+        if (adaptSqlDialect) {
+            sql = adaptSql(sql);
+        }
+        
         List<T> results = query(sql, mapper, params);
         return results.isEmpty() ? Optional.empty() : Optional.of(results.get(0));
     }
 
     @Override
     public int update(String sql, Object... params) {
+        // Adapt SQL to current database dialect if enabled
+        if (adaptSqlDialect) {
+            sql = adaptSql(sql);
+        }
+        
         try (Connection connection = connectionManager.getConnection();
              PreparedStatement statement = prepareStatement(connection, sql, params)) {
             
@@ -109,6 +128,11 @@ public class DefaultDatabase implements Database, BatchOperations {
 
     @Override
     public long insert(String sql, Object... params) throws SQLException {
+        // Adapt SQL to current database dialect if enabled
+        if (adaptSqlDialect) {
+            sql = adaptSql(sql);
+        }
+        
         Connection connection = null;
         PreparedStatement statement = null;
         ResultSet generatedKeys = null;
@@ -279,20 +303,54 @@ public class DefaultDatabase implements Database, BatchOperations {
         return strings;
     }
     
+    /**
+     * Adapt SQL to the current database dialect
+     *
+     * @param sql The SQL statement to adapt
+     * @return The adapted SQL statement
+     */
+    private String adaptSql(String sql) {
+        DatabaseType dbType = connectionManager.getType();
+        String adaptedSql = SqlDialectAdapter.adaptSql(sql, dbType);
+        
+        // Log the conversion if debug is enabled and something changed
+        if (!sql.equals(adaptedSql) && plugin.getConfig().getBoolean("debug.log-queries", false)) {
+            SqlDialectAdapter.logConversion(sql, adaptedSql, dbType);
+        }
+        
+        return adaptedSql;
+    }
+    
     // BatchOperations implementation
     
     @Override
     public int[] batchInsert(String sql, List<Object[]> batchParams) {
+        // Adapt SQL to current database dialect if enabled
+        if (adaptSqlDialect) {
+            sql = adaptSql(sql);
+        }
         return batchOperations.batchInsert(sql, batchParams);
     }
     
     @Override
     public int[] batchUpdate(String sql, List<Object[]> batchParams) {
+        // Adapt SQL to current database dialect if enabled
+        if (adaptSqlDialect) {
+            sql = adaptSql(sql);
+        }
         return batchOperations.batchUpdate(sql, batchParams);
     }
     
     @Override
     public boolean executeBatch(List<String> statements) {
+        // Adapt each statement to current database dialect if enabled
+        if (adaptSqlDialect) {
+            List<String> adaptedStatements = new ArrayList<>();
+            for (String statement : statements) {
+                adaptedStatements.add(adaptSql(statement));
+            }
+            return batchOperations.executeBatch(adaptedStatements);
+        }
         return batchOperations.executeBatch(statements);
     }
     
@@ -308,6 +366,10 @@ public class DefaultDatabase implements Database, BatchOperations {
     
     @Override
     public <T> List<List<T>> batchQuery(String sql, List<Object[]> batchParams, Function<Map<String, Object>, T> mapper) {
+        // Adapt SQL to current database dialect if enabled
+        if (adaptSqlDialect) {
+            sql = adaptSql(sql);
+        }
         return batchOperations.batchQuery(sql, batchParams, mapper);
     }
 }
