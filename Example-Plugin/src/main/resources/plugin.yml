@@ -1,0 +1,50 @@
+name: ExamplePlugin
+version: '${version}'
+main: com.example.exampleplugin.ExamplePlugin
+api-version: '1.16'
+description: Example plugin demonstrating Core-Utils and SQL-Bridge integration
+authors: [Craftingkilla1]
+website: https://github.com/Craftingkilla1/Example-Plugin
+
+# Dependencies
+depend: [CoreUtils]
+softdepend: [SQLBridge]
+
+# Define commands
+commands:
+  example:
+    description: Example plugin commands
+    usage: /example <help|process|stats|feature|version|db>
+    aliases: [ex]
+    permission: example.use
+  exampledb:
+    description: Example plugin database commands
+    usage: /exampledb <help|player|stat|top|transaction|metrics>
+    aliases: [exdb]
+    permission: example.db
+    
+# Define permissions
+permissions:
+  example.use:
+    description: Allows use of the example command
+    default: true
+  example.process:
+    description: Allows processing text with the example command
+    default: op
+    children:
+      example.use: true
+  example.stats:
+    description: Allows viewing service statistics
+    default: op
+    children:
+      example.use: true
+  example.feature:
+    description: Allows checking or changing feature status
+    default: op
+    children:
+      example.use: true
+  example.db:
+    description: Allows database operations
+    default: op
+    children:
+      example.use: true

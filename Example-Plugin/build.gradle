@@ -1,0 +1,16 @@
+description = 'Example plugin demonstrating Core-Utils and SQL-Bridge integration'
+
+// Override group for this project
+group = 'com.example'
+
+// Version is managed by the VersioningPlugin
+
+dependencies {
+    // For development, use project dependencies
+    compileOnly project(':Core-Utils')
+    compileOnly project(':Sql-Bridge')
+}
+
+shadowJar {
+    archiveBaseName.set('ExamplePlugin')
+}

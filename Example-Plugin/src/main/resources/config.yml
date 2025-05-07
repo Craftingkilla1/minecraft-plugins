@@ -1,0 +1,30 @@
+# ExamplePlugin Configuration
+# This is an example configuration file
+
+# Debug mode
+# Set to true to enable debug logging
+debug: false
+
+# Features configuration
+# Enable or disable features
+features:
+  example_feature_1: true
+  example_feature_2: false
+  example_feature_3: true
+  database_integration: true
+
+# Database settings
+# These settings are used for SQL-Bridge integration
+database:
+  # Whether to create tables automatically
+  auto-create-tables: true
+  
+  # Table prefix for this plugin
+  table-prefix: 'example_'
+  
+  # Performance settings
+  cache-enabled: true
+  cache-size: 100
+  
+  # Maximum query time warning (milliseconds)
+  slow-query-threshold: 1000

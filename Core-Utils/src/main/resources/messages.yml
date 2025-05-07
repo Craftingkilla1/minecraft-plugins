@@ -1,0 +1,49 @@
+# Core-Utils Messages File
+
+# Prefix settings
+prefixes:
+  default: "&7[&6CoreUtils&7] "
+  error: "&7[&cCoreUtils&7] &c"
+  success: "&7[&aCoreUtils&7] &a"
+
+# General messages
+general:
+  plugin-enabled: "Core-Utils has been enabled"
+  plugin-disabled: "Core-Utils has been disabled"
+  config-reloaded: "Configuration reloaded successfully"
+  debug-enabled: "Debug mode has been enabled"
+  debug-disabled: "Debug mode has been disabled"
+  no-permission: "You don't have permission to use this command"
+  player-only: "This command can only be used by players"
+  console-only: "This command can only be used from the console"
+  unknown-command: "Unknown command. Use /coreutils help for a list of commands"
+  unknown-player: "Unknown player: {player}"
+
+# Command messages
+commands:
+  help:
+    title: "=== Core-Utils Commands ==="
+    entry: "/{command} {usage} - {description}"
+    no-commands: "No commands available"
+  admin:
+    reload-success: "Core-Utils configuration reloaded successfully"
+    reload-error: "Error reloading configuration: {error}"
+    version: "Core-Utils version: {version}"
+    debug-enabled: "Debug mode enabled"
+    debug-disabled: "Debug mode disabled"
+    debug-invalid: "Invalid debug mode. Use 'on' or 'off'"
+    
+# Service messages
+services:
+  registered: "Service registered: {service}"
+  unregistered: "Service unregistered: {service}"
+  not-found: "Service not found: {service}"
+  already-registered: "Service already registered: {service}"
+  
+# Error messages
+errors:
+  command-execution: "Error executing command: {error}"
+  invalid-argument: "Invalid argument: {argument}"
+  missing-argument: "Missing argument: {argument}"
+  too-many-arguments: "Too many arguments"
+  not-implemented: "This feature is not implemented yet"

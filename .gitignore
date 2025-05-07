@@ -1,0 +1,23 @@
+# Gradle
+.gradle/
+**/build/
+!gradle/wrapper/gradle-wrapper.jar
+
+# IDE files
+.idea/
+*.iml
+.settings/
+.classpath
+.project
+
+# Build files
+**/bin/
+**/out/
+**/target/
+
+# Logs
+*.log
+
+# Credentials
+**/credentials.properties
+**/local.properties

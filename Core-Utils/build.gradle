@@ -1,0 +1,17 @@
+description = 'Core utilities for Minecraft plugins'
+
+// Set project-specific version
+// Use project version from versioning plugin instead of trying to access root ext property
+// The version is automatically set by the VersioningPlugin
+
+shadowJar {
+    archiveBaseName.set('CoreUtils')
+    
+    // Relocate dependencies if needed
+    // relocate 'com.somelib', 'com.minecraft.core.lib.somelib'
+}
+
+// Skip tests for now
+test {
+    exclude '**/*'
+}

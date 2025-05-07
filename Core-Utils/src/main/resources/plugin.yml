@@ -1,0 +1,44 @@
+name: CoreUtils
+version: '${version}'
+main: com.minecraft.core.CorePlugin
+api-version: '1.16'
+description: Core utilities for Minecraft plugins
+authors: [Minecraft Development Team]
+website: https://github.com/Craftingkilla1/Core-Utils
+
+# Standard load order
+load: STARTUP
+
+# Define commands this plugin provides
+commands:
+  coreutils:
+    description: Core Utilities management command
+    usage: /coreutils <reload|info|help>
+    aliases: [cu]
+    permission: coreutils.admin
+    
+# Define permissions
+permissions:
+  coreutils.admin:
+    description: Allows access to CoreUtils administrative commands
+    default: op
+  coreutils.reload:
+    description: Allows reloading of CoreUtils configuration
+    default: op
+    children:
+      coreutils.admin: true
+  coreutils.info:
+    description: Allows viewing information about CoreUtils
+    default: op
+    children:
+      coreutils.admin: true
+  coreutils.debug:
+    description: Allows toggling debug mode
+    default: op
+    children:
+      coreutils.admin: true
+  coreutils.services:
+    description: Allows viewing registered services
+    default: op
+    children:
+      coreutils.admin: true

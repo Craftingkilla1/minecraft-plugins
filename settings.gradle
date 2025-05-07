@@ -1,0 +1,11 @@
+rootProject.name = 'minecraft-plugins'
+
+// Include all projects
+include 'Core-Utils'
+include 'Sql-Bridge'
+include 'Example-Plugin'
+
+// Optional project directory configuration if needed
+// project(':Core-Utils').projectDir = file('Core-Utils')
+// project(':Sql-Bridge').projectDir = file('Sql-Bridge')
+// project(':Example-Plugin').projectDir = file('Example-Plugin')

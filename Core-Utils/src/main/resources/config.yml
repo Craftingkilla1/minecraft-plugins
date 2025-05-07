@@ -1,0 +1,57 @@
+# Core-Utils Configuration File
+
+# Debug mode - enables additional logging
+debug-mode: false
+
+# BungeeCord support - enables BungeeCord messaging channels
+bungee-support: false
+
+# Prefix settings
+prefixes:
+  # Default message prefix
+  default: "&7[&6CoreUtils&7] "
+  # Error message prefix
+  error: "&7[&cCoreUtils&7] &c"
+  # Success message prefix
+  success: "&7[&aCoreUtils&7] &a"
+
+# Cache settings
+cache:
+  # Maximum cache size for service lookups
+  max-size: 1000
+  # Cache expiration time in minutes
+  expiration-minutes: 30
+
+# Performance settings
+performance:
+  # Thread pool size for async operations
+  thread-pool-size: 4
+  # How often to save async data (in seconds)
+  save-interval: 300
+
+# Security settings
+security:
+  # Restrict command execution to specific plugins
+  restrict-commands: false
+  # List of allowed plugins for command execution
+  allowed-plugins: []
+
+# Logging settings
+logging:
+  # Log service registrations
+  log-service-registrations: true
+  # Log command registrations
+  log-command-registrations: true
+  # Log prefix
+  prefix: "[CoreUtils] "
+  # Log level (INFO, WARNING, SEVERE, DEBUG)
+  level: "INFO"
+
+# Advanced settings - only modify if you know what you're doing
+advanced:
+  # Command registration timeout (milliseconds)
+  command-registration-timeout: 5000
+  # Service lookup timeout (milliseconds)
+  service-lookup-timeout: 2000
+  # Enable performance monitoring
+  enable-performance-monitoring: false

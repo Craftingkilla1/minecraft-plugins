@@ -1,0 +1,188 @@
+// Root project build file
+plugins {
+    id 'java'
+    id 'maven-publish'
+    id 'com.github.johnrengelman.shadow' version '7.1.2' apply false
+}
+
+// Apply custom plugins
+apply plugin: com.minecraft.gradle.VersioningPlugin
+apply plugin: com.minecraft.gradle.GitHubPlugin
+
+// GitHub configuration
+github {
+    privateRepo = false
+    rootRepoName = 'minecraft-plugins'  // This is the name of the single repository
+}
+
+// Common dependency versions
+ext {
+    // Minecraft dependencies
+    minecraftVersion = '1.16.5-R0.1-SNAPSHOT'
+    
+    // Database drivers
+    mysqlVersion = '8.0.28'
+    postgresqlVersion = '42.3.3'
+    h2Version = '2.1.210'
+    
+    // Testing
+    junitVersion = '5.8.2'
+    mockitoVersion = '4.3.1'
+}
+
+// Configuration for all projects
+allprojects {
+    apply plugin: 'java'
+    
+    repositories {
+        mavenCentral()
+        maven {
+            name = 'spigotmc-repo'
+            url = 'https://hub.spigotmc.org/nexus/content/repositories/snapshots/'
+        }
+        maven {
+            name = 'sonatype'
+            url = 'https://oss.sonatype.org/content/groups/public/'
+        }
+    }
+    
+    java {
+        sourceCompatibility = JavaVersion.VERSION_1_8
+        targetCompatibility = JavaVersion.VERSION_1_8
+    }
+    
+    tasks.withType(JavaCompile) {
+        options.encoding = 'UTF-8'
+    }
+}
+
+// Configuration for subprojects
+subprojects {
+    apply plugin: 'maven-publish'
+    apply plugin: 'com.github.johnrengelman.shadow'
+    apply plugin: com.minecraft.gradle.VersioningPlugin
+    
+    dependencies {
+        // Common dependencies for all projects
+        compileOnly "org.spigotmc:spigot-api:${rootProject.ext.minecraftVersion}"
+        
+        // Testing dependencies
+        testImplementation "org.junit.jupiter:junit-jupiter-api:${rootProject.ext.junitVersion}"
+        testRuntimeOnly "org.junit.jupiter:junit-jupiter-engine:${rootProject.ext.junitVersion}"
+        testImplementation "org.mockito:mockito-core:${rootProject.ext.mockitoVersion}"
+    }
+    
+    // Configure Javadoc task to be more lenient
+    javadoc {
+        options.addStringOption('Xdoclint:none', '-quiet')
+        failOnError = false
+    }
+    
+    // Create sources JAR
+    task sourcesJar(type: Jar, dependsOn: classes) {
+        archiveClassifier.set('sources')
+        from sourceSets.main.allSource
+    }
+    
+    // Create javadoc JAR
+    task javadocJar(type: Jar, dependsOn: javadoc) {
+        archiveClassifier.set('javadoc')
+        from javadoc.destinationDir
+    }
+    
+    // Shadow JAR configuration
+    shadowJar {
+        archiveClassifier.set('')
+        
+        // Handle duplicate files
+        duplicatesStrategy = DuplicatesStrategy.INCLUDE
+    }
+    
+    // Process resources
+    processResources {
+        duplicatesStrategy = DuplicatesStrategy.INCLUDE
+        
+        filesMatching('plugin.yml') {
+            expand(
+                'version': project.version,
+                'name': project.name
+            )
+        }
+    }
+    
+    // Publishing configuration
+    publishing {
+        publications {
+            mavenJava(MavenPublication) {
+                artifact shadowJar
+                artifact sourcesJar
+                artifact javadocJar
+                
+                pom {
+                    name = project.name
+                    description = project.description ?: project.name
+                    url = "https://github.com/${project.findProperty('github.username') ?: System.getenv('GITHUB_USERNAME')}/${rootProject.github.rootRepoName ?: rootProject.name}"
+                    
+                    licenses {
+                        license {
+                            name = 'The MIT License'
+                            url = 'https://opensource.org/licenses/MIT'
+                        }
+                    }
+                    
+                    developers {
+                        developer {
+                            id = project.findProperty('github.username') ?: System.getenv('GITHUB_USERNAME')
+                            name = project.findProperty('github.username') ?: System.getenv('GITHUB_USERNAME')
+                            email = project.findProperty('github.email') ?: 'your.email@example.com'
+                        }
+                    }
+                }
+            }
+        }
+        
+        repositories {
+            // Local Maven repository
+            mavenLocal()
+            
+            // Project repository
+            maven {
+                name = 'projectRepo'
+                url = "${rootProject.buildDir}/repo"
+            }
+            
+            // GitHub Packages repository
+            maven {
+                name = "GitHubPackages"
+                url = uri("https://maven.pkg.github.com/${project.findProperty('github.username') ?: System.getenv('GITHUB_USERNAME')}/${rootProject.github.rootRepoName ?: rootProject.name}")
+                credentials {
+                    username = project.findProperty('github.username') ?: System.getenv('GITHUB_USERNAME')
+                    password = project.findProperty('github.token') ?: System.getenv('GITHUB_TOKEN')
+                }
+            }
+        }
+    }
+    
+    // Configure test task
+    test {
+        useJUnitPlatform()
+    }
+    
+    build {
+        dependsOn shadowJar
+    }
+}
+
+// Task to release all projects to GitHub
+task releaseAll {
+    group = 'github'
+    description = 'Release all projects to GitHub'
+    
+    dependsOn tasks.releaseToGitHub
+    subprojects.each { subproject ->
+        dependsOn subproject.tasks.build
+    }
+}
+
+// Don't build anything in the root project
+tasks.jar.enabled = false

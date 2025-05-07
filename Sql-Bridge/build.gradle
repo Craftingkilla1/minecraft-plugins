@@ -1,0 +1,29 @@
+description = 'Database connectivity for modular plugin architecture'
+
+// Set project-specific version is handled by the VersioningPlugin
+
+dependencies {
+    // For development, use project dependency
+    compileOnly project(':Core-Utils')
+    
+    // Database drivers - MySQL/MariaDB
+    implementation "mysql:mysql-connector-java:${rootProject.ext.mysqlVersion}"
+    
+    // Optional database drivers
+    implementation "org.postgresql:postgresql:${rootProject.ext.postgresqlVersion}"
+    implementation "com.h2database:h2:${rootProject.ext.h2Version}"
+}
+
+shadowJar {
+    archiveBaseName.set('SqlBridge')
+    
+    // Relocate dependencies to avoid conflicts
+    relocate 'com.mysql', 'com.minecraft.sqlbridge.lib.mysql'
+    relocate 'org.postgresql', 'com.minecraft.sqlbridge.lib.postgresql'
+    relocate 'org.h2', 'com.minecraft.sqlbridge.lib.h2'
+    
+    // Include license files
+    from('LICENSE') {
+        into '/'
+    }
+}
