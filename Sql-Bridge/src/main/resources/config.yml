@@ -1,151 +1,78 @@
-# SQL-Bridge Plugin Configuration
+# ./Sql-Bridge/src/main/resources/config.yml
+# SQL-Bridge Configuration
+
+# Debug mode - enables additional logging
+debug: false
 
 # Database configuration
 database:
-  # Database type (MYSQL, SQLITE, POSTGRESQL, H2)
-  type: MYSQL
+  # MySQL configuration
+  mysql:
+    host: localhost
+    port: 3306
+    database: minecraft
+    username: root
+    password: password
+    # Whether to create the database if it doesn't exist
+    auto-create-database: true
+    
+    # Connection pool settings (HikariCP)
+    pool:
+      # Maximum size of the connection pool
+      maximum-pool-size: 10
+      # Minimum number of idle connections
+      minimum-idle: 5
+      # Maximum lifetime of a connection in milliseconds
+      maximum-lifetime: 1800000
+      # Connection timeout in milliseconds
+      connection-timeout: 30000
+      # How often to check idle connections for validity
+      idle-timeout: 600000
+      # Keep alive time (in ms)
+      keepalive-time: 30000
+      # Whether to log connection leaks
+      leak-detection-threshold: 30000
+  
+# BungeeSupport configuration
+bungee:
+  # Whether to enable BungeeSupport for multi-server setups
+  enabled: false
+  # Use shared database across BungeeCord network
+  shared-database: true
 
-  # MySQL/PostgreSQL settings (ignored for SQLite and H2)
-  host: localhost
-  port: 3306
-  name: minecraft
-  username: root
-  password: "yourpassword"  # Replace with your actual MySQL password
-
-# Connection pool settings
-pool:
-  # Minimum idle connections
-  min-idle: 5
-  # Maximum connections
-  max-size: 10
-  # Connection timeout in milliseconds
-  timeout: 30000
-
-# Connection settings
-connection:
-  # Connection timeout in milliseconds (for acquiring a connection)
-  timeout: 30000
-  # Maximum age of a connection (in milliseconds) before it's replaced
-  max-age: 3600000
-  # Idle timeout - connections idle for longer than this will be closed (in milliseconds)
-  idle-timeout: 600000
-
-# Connection monitoring settings
-monitor:
-  # Health check interval in seconds
-  health-check-interval: 60
-  # Maximum idle time before a connection is considered stale (in seconds)
-  max-idle-time: 600
-  # Maximum failed health checks before forced reconnection
-  max-failed-checks: 3
-  # Critical failure threshold - number of consecutive failures before emergency action
-  critical-threshold: 5
-  # Number of idle connections that triggers cleanup
-  idle-cleanup-threshold: 5
-
-# Error handling settings
-error:
-  # Maximum consecutive failures before entering recovery mode
-  max-consecutive-failures: 3
-  # Error threshold period in seconds (window to count errors)
-  threshold-period: 60
-  # Error threshold count (number of errors in period to trigger recovery)
-  threshold-count: 10
-  # Enable automatic recovery attempts
-  auto-recovery: true
-  # Recovery backoff multiplier - each retry waits this times longer
-  backoff-multiplier: 2
-
-# Batch operation settings
-batch:
-  # Default batch size
-  size: 100
-  # Maximum batch size
-  max-size: 1000
-  # Batch execution timeout in milliseconds
-  timeout: 60000
-
-# Enhanced logging settings
-logging:
-  # Enable file logging
-  file-enabled: true
-  # Enable console logging
-  console-enabled: true
-  # Log buffer size per category
-  buffer-size: 1000
-  # Flush interval in seconds
-  flush-interval: 60
-  # Filter debug messages in normal mode
-  filter-debug: true
-  # Categories to enable file logging (comma separated)
-  file-categories: query,error,security,performance,connection,migration,general
-  # Categories to enable console logging (comma separated)
-  console-categories: error,security,general
-
-# Security settings
+# Security configuration
 security:
-  # SQL injection detection
-  injection-detection:
-    # Enable SQL injection detection
-    enabled: true
-    # Block queries that are detected as SQL injection attempts
-    block-queries: true
-    # Log SQL injection attempts
-    log-attempts: true
-    # Notify admins when SQL injection is detected
-    notify-admins: true
-  
-  # Input validation
-  validation:
-    # Enable automatic input validation
-    enabled: true
-    # Block dangerous SQL operations
-    block-dangerous: true
-    # Maximum length for string values
-    max-param-length: 1000
-    # Maximum query length
-    max-query-length: 10000
+  # Enable SQL injection detection
+  sql-injection-detection: true
+  # Log dangerous operations
+  log-dangerous-operations: true
+  # Maximum query length
+  max-query-length: 10000
 
-# Statistics settings
-statistics:
-  # Enable statistics collection
+# Performance monitoring
+monitoring:
+  # Enable monitoring
   enabled: true
-  # Log statistics periodically
-  log-stats: true
-  # Log interval in minutes
-  log-interval: 60
-  # Threshold for slow queries (in milliseconds)
+  # Log slow queries that take longer than this many milliseconds
   slow-query-threshold: 1000
-  # Maximum number of slow queries to track
-  max-slow-queries: 100
+  # Collect metrics data
+  collect-metrics: true
+  # Metrics collection interval in seconds
+  metrics-interval: 300
 
-# Debug settings
-debug:
-  # Enable debug mode
-  enabled: false
-  # Enable SQL query logging
-  log-queries: false
-  # Log query execution time
-  log-timing: false
-  # Log connection open/close events
-  log-connections: false
-  # Enable detailed debug information
-  verbose: false
-
-# Migration settings
+# Migration system
 migrations:
-  # Auto-run migrations on plugin enable
-  auto-run: true
-  # Abort plugin startup if migrations fail
-  abort-on-fail: true
-  # Directory to look for migrations in
-  directory: migrations
-  
-# Test settings
-test:
-  # Enable test mode (creates in-memory test database)
-  enabled: false
-  # Run tests on plugin enable
-  run-on-enable: false
-  # Test timeout in milliseconds
-  timeout: 30000
+  # Automatic migration on startup
+  auto-migrate: true
+  # Rollback failed migrations
+  rollback-failed-migrations: true
+
+# Query batch settings
+batch:
+  # Default batch size for batch operations
+  default-size: 100
+  # Maximum batch size allowed
+  max-size: 1000
+
+# Database thread pool size for async operations
+database-thread-pool-size: 4

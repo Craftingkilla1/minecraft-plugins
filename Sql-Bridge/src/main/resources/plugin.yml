@@ -1,39 +1,30 @@
-name: SQLBridge
-version: '${version}'
+# ./Sql-Bridge/src/main/resources/plugin.yml
+name: SqlBridge
+version: '1.0.0'
 main: com.minecraft.sqlbridge.SqlBridgePlugin
 api-version: '1.16'
-description: Database connectivity for the modular plugin architecture
-authors: [Craftingkilla1]
-website: https://github.com/Craftingkilla1/Sql-Bridge
-
-# Dependencies
 depend: [CoreUtils]
-
-# Define commands
+softdepend: []
+authors: [MinecraftDevelopmentTeam]
+description: A high-performance database middleware plugin that provides a standardized API for SQL database operations.
 commands:
   sqlbridge:
-    description: Administrative commands for the SQL-Bridge plugin
-    usage: /sqlbridge <status|reload|metrics|test|help>
-    aliases: [sqlb]
+    description: Admin commands for the SQL Bridge plugin
+    usage: /<command> [info|status|reload|test]
     permission: sqlbridge.admin
-
-# Define permissions
 permissions:
   sqlbridge.admin:
-    description: Allows access to all SQL-Bridge administrative commands
+    description: Allows access to all SQL Bridge admin commands
+    default: op
+  sqlbridge.info:
+    description: Allows access to the SQL Bridge info command
     default: op
   sqlbridge.status:
-    description: Allows checking SQL-Bridge connection status
+    description: Allows access to the SQL Bridge status command
     default: op
-    children:
-      sqlbridge.admin: true
   sqlbridge.reload:
-    description: Allows reloading SQL-Bridge configuration
+    description: Allows access to the SQL Bridge reload command
     default: op
-    children:
-      sqlbridge.admin: true
-  sqlbridge.metrics:
-    description: Allows viewing SQL-Bridge performance metrics
+  sqlbridge.test:
+    description: Allows access to the SQL Bridge test command
     default: op
-    children:
-      sqlbridge.admin: true

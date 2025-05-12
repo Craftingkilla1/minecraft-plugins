@@ -1,182 +1,254 @@
+// ./Example-Plugin/src/main/java/com/example/exampleplugin/ExamplePlugin.java
 package com.example.exampleplugin;
 
-import com.example.exampleplugin.database.DatabaseManager;
-import com.minecraft.core.CorePlugin;
 import com.minecraft.core.api.service.ServiceLocator;
-import com.minecraft.core.api.service.ServiceRegistry;
-import com.minecraft.core.command.CommandRegistry;
-import com.minecraft.core.utils.LogUtil;
-import com.minecraft.core.utils.TimeUtil;
-import com.minecraft.sqlbridge.SqlBridgePlugin;
+import com.minecraft.sqlbridge.api.Database;
+import com.minecraft.sqlbridge.api.DatabaseService;
+import com.minecraft.sqlbridge.migration.Migration;
 
-import org.bukkit.Bukkit;
-import org.bukkit.plugin.Plugin;
+import org.bukkit.command.Command;
+import org.bukkit.command.CommandSender;
+import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 
+import java.sql.Connection;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+import java.util.logging.Level;
+
 /**
- * Example plugin that demonstrates how to use both Core-Utils and SQL-Bridge APIs
+ * Example plugin demonstrating the use of SQL-Bridge.
  */
 public class ExamplePlugin extends JavaPlugin {
-    private CorePlugin coreUtils;
-    private SqlBridgePlugin sqlBridge;
-    private ExampleService exampleService;
-    private DatabaseManager databaseManager;
-    
+
+    private DatabaseService databaseService;
+    private Database database;
+    private PlayerDataManager playerDataManager;
+
     @Override
     public void onEnable() {
         // Save default config
         saveDefaultConfig();
         
-        // Check if Core-Utils is available
-        Plugin coreUtilsPlugin = Bukkit.getPluginManager().getPlugin("CoreUtils");
-        if (coreUtilsPlugin == null || !(coreUtilsPlugin instanceof CorePlugin)) {
-            getLogger().severe("Core-Utils not found! This plugin requires Core-Utils to function.");
-            getLogger().severe("Please download Core-Utils from: https://example.com/core-utils");
-            Bukkit.getPluginManager().disablePlugin(this);
+        // Get the DatabaseService from SQL-Bridge
+        databaseService = ServiceLocator.getService(DatabaseService.class);
+        
+        if (databaseService == null) {
+            getLogger().severe("Could not find DatabaseService. Make sure SQL-Bridge is installed and enabled.");
+            getServer().getPluginManager().disablePlugin(this);
             return;
         }
         
-        // Get the Core-Utils instance
-        coreUtils = (CorePlugin) coreUtilsPlugin;
+        // Get a database connection for this plugin
+        database = databaseService.getDatabaseForPlugin(getName());
         
-        // Initialize with Core-Utils LogUtil
-        LogUtil.init(this);
-        LogUtil.setPrefix("[ExamplePlugin] ");
+        // Register migrations
+        List<Migration> migrations = Arrays.asList(
+            new CreateTablesV1Migration(),
+            new AddIndexesV2Migration()
+        );
         
-        // Check if we should enable debug mode
-        boolean debugEnabled = getConfig().getBoolean("debug", false);
-        LogUtil.setDebugMode(debugEnabled);
+        databaseService.registerMigrations(getName(), migrations);
         
-        // Check if SQL-Bridge is available
-        Plugin sqlBridgePlugin = Bukkit.getPluginManager().getPlugin("SQLBridge");
-        if (sqlBridgePlugin == null) {
-            LogUtil.warning("SQL-Bridge not found! Database functionality will be disabled.");
-            LogUtil.warning("Please download SQL-Bridge from: https://example.com/sql-bridge");
+        // Run migrations
+        try {
+            int appliedCount = databaseService.runMigrations(getName());
+            getLogger().info("Applied " + appliedCount + " migrations.");
+        } catch (Exception e) {
+            getLogger().log(Level.SEVERE, "Failed to run migrations", e);
+            getServer().getPluginManager().disablePlugin(this);
+            return;
+        }
+        
+        // Initialize player data manager
+        playerDataManager = new PlayerDataManager(this, database);
+        
+        // Register events
+        getServer().getPluginManager().registerEvents(new PlayerListener(this, playerDataManager), this);
+        
+        getLogger().info("ExamplePlugin has been enabled!");
+    }
+
+    @Override
+    public void onDisable() {
+        // Save any pending data
+        if (playerDataManager != null) {
+            playerDataManager.saveAllPlayers();
+        }
+        
+        getLogger().info("ExamplePlugin has been disabled!");
+    }
+
+    @Override
+    public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
+        if (!(sender instanceof Player)) {
+            sender.sendMessage("This command can only be run by a player.");
+            return true;
+        }
+        
+        Player player = (Player) sender;
+        
+        if (command.getName().equalsIgnoreCase("stats")) {
+            // Handle stats command
+            handleStatsCommand(player, args);
+            return true;
+        } else if (command.getName().equalsIgnoreCase("resetstats")) {
+            // Handle resetstats command
+            handleResetStatsCommand(player);
+            return true;
+        }
+        
+        return false;
+    }
+    
+    /**
+     * Handle the /stats command.
+     *
+     * @param player The player who executed the command
+     * @param args The command arguments
+     */
+    private void handleStatsCommand(Player player, String[] args) {
+        PlayerData playerData = playerDataManager.getPlayerData(player.getUniqueId());
+        
+        if (playerData != null) {
+            player.sendMessage("§6=== Your Stats ===");
+            player.sendMessage("§7Blocks Broken: §a" + playerData.getBlocksBroken());
+            player.sendMessage("§7Blocks Placed: §a" + playerData.getBlocksPlaced());
+            player.sendMessage("§7Mobs Killed: §a" + playerData.getMobsKilled());
+            player.sendMessage("§7Deaths: §a" + playerData.getDeaths());
+            player.sendMessage("§7Last Seen: §a" + new java.util.Date(playerData.getLastSeen()));
         } else {
+            player.sendMessage("§cNo stats available. Please reconnect.");
+        }
+    }
+    
+    /**
+     * Handle the /resetstats command.
+     *
+     * @param player The player who executed the command
+     */
+    private void handleResetStatsCommand(Player player) {
+        // Check permission
+        if (!player.hasPermission("exampleplugin.resetstats")) {
+            player.sendMessage("§cYou don't have permission to use this command.");
+            return;
+        }
+        
+        // Reset stats asynchronously
+        getServer().getScheduler().runTaskAsynchronously(this, () -> {
             try {
-                // Try to safely cast to SqlBridgePlugin using reflection to avoid class not found errors
-                Class<?> sqlBridgeClass = Class.forName("com.minecraft.sqlbridge.SqlBridgePlugin");
-                if (sqlBridgeClass.isInstance(sqlBridgePlugin)) {
-                    // Get the SQL-Bridge instance
-                    sqlBridge = (SqlBridgePlugin) sqlBridgePlugin;
-                    LogUtil.info("SQL-Bridge found! Database functionality is enabled.");
-                } else {
-                    LogUtil.warning("Found plugin named SQLBridge but it's not the expected type!");
-                }
-            } catch (ClassNotFoundException e) {
-                LogUtil.warning("SQL-Bridge API classes not found in classpath. Database functionality will be disabled.");
-                LogUtil.debug("Error: " + e.getMessage());
+                playerDataManager.resetPlayerStats(player.getUniqueId());
+                player.sendMessage("§aYour stats have been reset.");
             } catch (Exception e) {
-                LogUtil.warning("Error initializing SQL-Bridge: " + e.getMessage());
-                LogUtil.debug("Stack trace: " + e.getClass().getName());
+                getLogger().log(Level.SEVERE, "Failed to reset stats for " + player.getName(), e);
+                player.sendMessage("§cFailed to reset stats. Please try again later.");
+            }
+        });
+    }
+    
+    /**
+     * Get the database instance.
+     *
+     * @return The database instance
+     */
+    public Database getDatabase() {
+        return database;
+    }
+    
+    /**
+     * Get the player data manager.
+     *
+     * @return The player data manager
+     */
+    public PlayerDataManager getPlayerDataManager() {
+        return playerDataManager;
+    }
+    
+    /**
+     * Migration to create initial tables.
+     */
+    private class CreateTablesV1Migration implements Migration {
+        
+        @Override
+        public int getVersion() {
+            return 1;
+        }
+        
+        @Override
+        public String getDescription() {
+            return "Create initial tables";
+        }
+        
+        @Override
+        public void migrate(Connection connection) throws SQLException {
+            try (Statement stmt = connection.createStatement()) {
+                // Create player_data table
+                String createPlayerDataTable = 
+                    "CREATE TABLE player_data (" +
+                    "uuid VARCHAR(36) PRIMARY KEY," +
+                    "name VARCHAR(16) NOT NULL," +
+                    "blocks_broken INT NOT NULL DEFAULT 0," +
+                    "blocks_placed INT NOT NULL DEFAULT 0," +
+                    "mobs_killed INT NOT NULL DEFAULT 0," +
+                    "deaths INT NOT NULL DEFAULT 0," +
+                    "last_seen BIGINT NOT NULL," +
+                    "first_join BIGINT NOT NULL" +
+                    ")";
+                
+                stmt.executeUpdate(createPlayerDataTable);
             }
         }
         
-        // Initialize database manager
-        databaseManager = new DatabaseManager(this);
-        
-        // Create and register our service
-        exampleService = new DefaultExampleService(this);
-        ServiceRegistry.register(ExampleService.class, exampleService);
-        
-        // Register our commands using the Core-Utils command framework
-        registerCommands();
-        
-        LogUtil.info("Example plugin enabled successfully!");
-        LogUtil.debug("Current time: " + TimeUtil.formatDateTime(TimeUtil.now()));
-    }
-    
-    @Override
-    public void onDisable() {
-        // Unregister our service
-        if (exampleService != null) {
-            ServiceRegistry.unregister(ExampleService.class);
-            exampleService = null;
-        }
-        
-        // Any other cleanup
-        LogUtil.info("Example plugin disabled successfully!");
-    }
-    
-    /**
-     * Register commands with Core-Utils command framework
-     */
-    private void registerCommands() {
-        // Get the command registry from Core-Utils
-        CommandRegistry commandRegistry = coreUtils.getCommandRegistry();
-        
-        // Register our standard command class
-        ExampleCommand exampleCommand = new ExampleCommand(this);
-        commandRegistry.registerCommand(exampleCommand);
-        
-        // Register our database command class if SQL-Bridge is available
-        if (sqlBridge != null && databaseManager.isInitialized()) {
-            DatabaseCommand databaseCommand = new DatabaseCommand(this, databaseManager);
-            commandRegistry.registerCommand(databaseCommand);
-            LogUtil.debug("Registered database commands");
-        }
-        
-        LogUtil.debug("Registered Example plugin commands");
-    }
-    
-    /**
-     * Get the service instance
-     * 
-     * @return The example service instance
-     */
-    public ExampleService getService() {
-        return exampleService;
-    }
-    
-    /**
-     * Get the database manager
-     * 
-     * @return The database manager instance
-     */
-    public DatabaseManager getDatabaseManager() {
-        return databaseManager;
-    }
-    
-    /**
-     * Example of accessing a service from another plugin
-     */
-    public void useOtherService() {
-        // Try to access a service from another plugin
-        try {
-            // This will throw an exception if the service isn't available
-            AnotherService anotherService = ServiceLocator.requireService(AnotherService.class);
-            
-            // Use the service
-            String result = anotherService.doSomething("example");
-            LogUtil.info("Result from AnotherService: " + result);
-            
-        } catch (ServiceLocator.ServiceNotFoundException e) {
-            LogUtil.warning("AnotherService is not available: " + e.getMessage());
+        @Override
+        public void rollback(Connection connection) throws SQLException {
+            try (Statement stmt = connection.createStatement()) {
+                stmt.executeUpdate("DROP TABLE IF EXISTS player_data");
+            }
         }
     }
     
     /**
-     * Get the Core-Utils plugin instance
-     * 
-     * @return The Core-Utils plugin instance
+     * Migration to add indexes to tables.
      */
-    public CorePlugin getCoreUtils() {
-        return coreUtils;
-    }
-    
-    /**
-     * Get the SQL-Bridge plugin instance
-     * 
-     * @return The SQL-Bridge plugin instance or null if not available
-     */
-    public SqlBridgePlugin getSqlBridge() {
-        return sqlBridge;
-    }
-    
-    /**
-     * Example service interface for another plugin
-     */
-    private interface AnotherService {
-        String doSomething(String input);
+    private class AddIndexesV2Migration implements Migration {
+        
+        @Override
+        public int getVersion() {
+            return 2;
+        }
+        
+        @Override
+        public String getDescription() {
+            return "Add indexes to tables";
+        }
+        
+        @Override
+        public void migrate(Connection connection) throws SQLException {
+            try (Statement stmt = connection.createStatement()) {
+                // Add index on player_data.name
+                String createNameIndex = 
+                    "CREATE INDEX idx_player_data_name ON player_data (name)";
+                
+                stmt.executeUpdate(createNameIndex);
+                
+                // Add index on player_data.last_seen
+                String createLastSeenIndex = 
+                    "CREATE INDEX idx_player_data_last_seen ON player_data (last_seen)";
+                
+                stmt.executeUpdate(createLastSeenIndex);
+            }
+        }
+        
+        @Override
+        public void rollback(Connection connection) throws SQLException {
+            try (Statement stmt = connection.createStatement()) {
+                stmt.executeUpdate("DROP INDEX IF EXISTS idx_player_data_name");
+                stmt.executeUpdate("DROP INDEX IF EXISTS idx_player_data_last_seen");
+            }
+        }
     }
 }

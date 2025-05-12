@@ -1,11 +1,16 @@
 description = 'Core utilities for Minecraft plugins'
 
-// Set project-specific version
-// Use project version from versioning plugin instead of trying to access root ext property
 // The version is automatically set by the VersioningPlugin
 
+dependencies {
+    // Bukkit/Spigot API is defined in root project
+    
+    // Add any Core-Utils specific dependencies here
+}
+
 shadowJar {
-    archiveBaseName.set('CoreUtils')
+    // Set the output file name with correct naming convention
+    archiveBaseName.set('core-utils')
     
     // Relocate dependencies if needed
     // relocate 'com.somelib', 'com.minecraft.core.lib.somelib'
@@ -14,4 +19,17 @@ shadowJar {
 // Skip tests for now
 test {
     exclude '**/*'
+}
+
+// Optional: Add specific publication configuration if needed
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            // Set correct artifact coordinates
+            groupId = 'com.minecraft'
+            artifactId = 'core-utils'
+            
+            // The rest is inherited from the parent build.gradle
+        }
+    }
 }

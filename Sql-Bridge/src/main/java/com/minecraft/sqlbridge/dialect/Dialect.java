@@ -1,147 +1,133 @@
+// ./Sql-Bridge/src/main/java/com/minecraft/sqlbridge/dialect/Dialect.java
 package com.minecraft.sqlbridge.dialect;
 
 /**
  * Interface for database-specific SQL dialects.
- * Provides methods for generating SQL statements in a database-specific format.
+ * This allows the plugin to adapt SQL queries for different database systems.
  */
 public interface Dialect {
-
+    
     /**
-     * Get the SQL for creating a table
+     * Get the database type for this dialect.
+     *
+     * @return The database type
+     */
+    String getDatabaseType();
+    
+    /**
+     * Check if the dialect supports a specific feature.
+     *
+     * @param feature The feature to check
+     * @return true if the feature is supported, false otherwise
+     */
+    boolean supportsFeature(DialectFeature feature);
+    
+    /**
+     * Format a table name according to the dialect rules.
+     *
+     * @param tableName The table name to format
+     * @return The formatted table name
+     */
+    String formatTableName(String tableName);
+    
+    /**
+     * Format a column name according to the dialect rules.
+     *
+     * @param columnName The column name to format
+     * @return The formatted column name
+     */
+    String formatColumnName(String columnName);
+    
+    /**
+     * Get the SQL for a LIMIT clause.
+     *
+     * @param limit The limit value
+     * @param offset The offset value, or null for no offset
+     * @return The SQL for the LIMIT clause
+     */
+    String getLimitClause(int limit, Integer offset);
+    
+    /**
+     * Get the SQL for creating a database.
+     *
+     * @param databaseName The name of the database to create
+     * @return The SQL for creating the database
+     */
+    String getCreateDatabaseSQL(String databaseName);
+    
+    /**
+     * Get the SQL for creating a table with an auto-increment primary key.
+     *
+     * @param tableName The name of the table
+     * @param primaryKeyColumn The name of the primary key column
+     * @return The SQL for creating the table
+     */
+    String getCreateTableWithAutoIncrementSQL(String tableName, String primaryKeyColumn);
+    
+    /**
+     * Get the SQL for a pagination query.
+     *
+     * @param innerQuery The inner query to paginate
+     * @param page The page number (1-based)
+     * @param pageSize The page size
+     * @return The SQL for the pagination query
+     */
+    String getPaginationSQL(String innerQuery, int page, int pageSize);
+    
+    /**
+     * Get the SQL for a case-insensitive LIKE clause.
+     *
+     * @param column The column to search
+     * @param pattern The search pattern
+     * @return The SQL for the case-insensitive LIKE clause
+     */
+    String getCaseInsensitiveLikeSQL(String column, String pattern);
+    
+    /**
+     * Get the placeholder for a parameter at the specified index.
+     * Most dialects use "?", but some might have different syntax.
+     *
+     * @param index The parameter index (1-based)
+     * @return The parameter placeholder
+     */
+    String getParameterPlaceholder(int index);
+    
+    /**
+     * Get the SQL for the current timestamp.
+     *
+     * @return The SQL for the current timestamp
+     */
+    String getCurrentTimestampSQL();
+    
+    /**
+     * Get the SQL for a random ordering.
+     *
+     * @return The SQL for random ordering
+     */
+    String getRandomOrderSQL();
+    
+    /**
+     * Get the SQL for an "IF EXISTS" condition for dropping objects.
+     *
+     * @return The SQL for the IF EXISTS condition
+     */
+    String getIfExistsSQL();
+    
+    /**
+     * Get the SQL for a batch insert.
      *
      * @param tableName The table name
-     * @param columns The column definitions
-     * @return The SQL statement
+     * @param columns The column names
+     * @param batchSize The number of rows to insert
+     * @return The SQL for the batch insert
      */
-    String createTable(String tableName, String... columns);
-
+    String getBatchInsertSQL(String tableName, String[] columns, int batchSize);
+    
     /**
-     * Get the SQL for dropping a table
+     * Get the SQL for a RETURNING clause (if supported).
      *
-     * @param tableName The table name
-     * @param ifExists Whether to add IF EXISTS clause
-     * @return The SQL statement
+     * @param columnName The column name to return
+     * @return The SQL for the RETURNING clause, or null if not supported
      */
-    String dropTable(String tableName, boolean ifExists);
-
-    /**
-     * Get the SQL for creating an index
-     *
-     * @param indexName The index name
-     * @param tableName The table name
-     * @param unique Whether the index should be unique
-     * @param columns The columns to include in the index
-     * @return The SQL statement
-     */
-    String createIndex(String indexName, String tableName, boolean unique, String... columns);
-
-    /**
-     * Get the SQL for checking if a table exists
-     *
-     * @param tableName The table name
-     * @return The SQL statement
-     */
-    String tableExists(String tableName);
-
-    /**
-     * Get the SQL type for an integer column
-     *
-     * @param autoIncrement Whether the column should auto-increment
-     * @return The SQL type
-     */
-    String getIntegerType(boolean autoIncrement);
-
-    /**
-     * Get the SQL type for a long integer column
-     *
-     * @param autoIncrement Whether the column should auto-increment
-     * @return The SQL type
-     */
-    String getLongType(boolean autoIncrement);
-
-    /**
-     * Get the SQL type for a string column
-     *
-     * @param length The maximum length of the string, or -1 for unlimited
-     * @return The SQL type
-     */
-    String getStringType(int length);
-
-    /**
-     * Get the SQL type for a boolean column
-     *
-     * @return The SQL type
-     */
-    String getBooleanType();
-
-    /**
-     * Get the SQL type for a timestamp column
-     *
-     * @return The SQL type
-     */
-    String getTimestampType();
-
-    /**
-     * Get the SQL type for a blob column
-     *
-     * @return The SQL type
-     */
-    String getBlobType();
-
-    /**
-     * Format a value for use in SQL
-     *
-     * @param value The value to format
-     * @return The formatted value
-     */
-    String formatValue(Object value);
-
-    /**
-     * Get the SQL for a LIKE clause that is case-insensitive
-     *
-     * @param column The column name
-     * @param value The value to match
-     * @return The SQL LIKE clause
-     */
-    String caseInsensitiveLike(String column, String value);
-
-    /**
-     * Get the SQL for a pagination clause
-     *
-     * @param limit The maximum number of rows to return, or -1 for unlimited
-     * @param offset The number of rows to skip
-     * @return The SQL pagination clause
-     */
-    String paginate(int limit, int offset);
-
-    /**
-     * Get the SQL for getting the last inserted ID
-     *
-     * @return The SQL statement
-     */
-    String getLastInsertId();
-
-    /**
-     * Get the SQL for a date formatting function
-     *
-     * @param column The column name or expression
-     * @param format The date format pattern
-     * @return The SQL function call
-     */
-    String formatDate(String column, String format);
-
-    /**
-     * Get the SQL for concatenating strings
-     *
-     * @param parts The parts to concatenate
-     * @return The SQL function call
-     */
-    String concat(String... parts);
-
-    /**
-     * Get the name of the database type
-     *
-     * @return The database type name
-     */
-    String getName();
+    String getReturningClause(String columnName);
 }

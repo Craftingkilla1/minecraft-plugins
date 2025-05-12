@@ -21,18 +21,26 @@ ext {
     minecraftVersion = '1.16.5-R0.1-SNAPSHOT'
     
     // Database drivers
-    mysqlVersion = '8.0.28'
+    mysqlVersion = '8.0.33'
     postgresqlVersion = '42.3.3'
-    h2Version = '2.1.210'
+    h2Version = '2.2.224'
+    
+    // HikariCP version
+    hikariCpVersion = '3.4.5'
     
     // Testing
-    junitVersion = '5.8.2'
-    mockitoVersion = '4.3.1'
+    junitVersion = '5.10.0'
+    mockitoVersion = '5.5.0'
+    
+    // Other common dependencies
+    lombokVersion = '1.18.30'
 }
 
 // Configuration for all projects
 allprojects {
     apply plugin: 'java'
+    
+    group = 'com.minecraft'
     
     repositories {
         mavenCentral()
@@ -114,6 +122,9 @@ subprojects {
     publishing {
         publications {
             mavenJava(MavenPublication) {
+                groupId = 'com.minecraft'
+                artifactId = project.name.toLowerCase().replace('-', '-')
+                
                 artifact shadowJar
                 artifact sourcesJar
                 artifact javadocJar

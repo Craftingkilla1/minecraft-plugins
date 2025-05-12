@@ -1,375 +1,470 @@
+// ./Sql-Bridge/src/main/java/com/minecraft/sqlbridge/impl/DefaultDatabase.java
 package com.minecraft.sqlbridge.impl;
 
 import com.minecraft.core.utils.LogUtil;
 import com.minecraft.sqlbridge.SqlBridgePlugin;
-import com.minecraft.sqlbridge.api.BatchOperations;
 import com.minecraft.sqlbridge.api.Database;
-import com.minecraft.sqlbridge.api.DatabaseType;
-import com.minecraft.sqlbridge.api.Query;
-import com.minecraft.sqlbridge.api.QueryBuilder;
-import com.minecraft.sqlbridge.api.Transaction;
-import com.minecraft.sqlbridge.connection.ConnectionManager;
-import com.minecraft.sqlbridge.dialect.SqlDialectAdapter;
-import com.minecraft.sqlbridge.query.DefaultQueryBuilder;
-import com.minecraft.sqlbridge.query.DefaultQuery;
-import com.minecraft.sqlbridge.stats.QueryStatistics;
+import com.minecraft.sqlbridge.api.query.QueryBuilder;
+import com.minecraft.sqlbridge.api.query.SelectBuilder;
+import com.minecraft.sqlbridge.api.query.InsertBuilder;
+import com.minecraft.sqlbridge.api.query.UpdateBuilder;
+import com.minecraft.sqlbridge.api.result.ResultMapper;
+import com.minecraft.sqlbridge.api.result.ResultRow;
+import com.minecraft.sqlbridge.api.transaction.Transaction;
+import com.minecraft.sqlbridge.error.DatabaseException;
+import com.minecraft.sqlbridge.monitoring.QueryStatistics;
+import com.minecraft.sqlbridge.security.QueryValidator;
 
+import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
-import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
-import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.function.Function;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
+import java.util.function.Consumer;
+import java.util.logging.Level;
 
 /**
  * Default implementation of the Database interface.
- * Provides database connectivity and operations for the SQL-Bridge plugin.
  */
-public class DefaultDatabase implements Database, BatchOperations {
+public class DefaultDatabase implements Database {
 
     private final SqlBridgePlugin plugin;
-    private final ConnectionManager connectionManager;
-    private final DefaultDatabaseBatchImpl batchOperations;
-    private final int defaultBatchSize = 100;
-    private final boolean adaptSqlDialect;
+    private final DataSource dataSource;
+    private final QueryValidator queryValidator;
+    private final QueryStatistics queryStatistics;
+    private final Executor asyncExecutor;
 
     /**
-     * Create a new default database
+     * Constructor for DefaultDatabase.
      *
-     * @param plugin The plugin instance
-     * @param connectionManager The connection manager
+     * @param plugin The SQL-Bridge plugin instance
+     * @param dataSource The data source for database connections
      */
-    public DefaultDatabase(SqlBridgePlugin plugin, ConnectionManager connectionManager) {
+    public DefaultDatabase(SqlBridgePlugin plugin, DataSource dataSource) {
         this.plugin = plugin;
-        this.connectionManager = connectionManager;
-        this.batchOperations = new DefaultDatabaseBatchImpl(this, connectionManager, 
-                plugin.getConfig().getInt("batch.size", defaultBatchSize));
-        // Get whether to adapt SQL dialects from config
-        this.adaptSqlDialect = plugin.getConfig().getBoolean("database.adapt-sql-dialect", true);
+        this.dataSource = dataSource;
+        this.queryValidator = new QueryValidator(plugin);
+        this.queryStatistics = new QueryStatistics(plugin);
+        this.asyncExecutor = Executors.newFixedThreadPool(
+                plugin.getPluginConfig().getDatabaseThreadPoolSize(),
+                r -> {
+                    Thread thread = new Thread(r, "SqlBridge-AsyncExecutor");
+                    thread.setDaemon(true);
+                    return thread;
+                });
     }
 
     @Override
-    public <T> List<T> query(String sql, Function<Map<String, Object>, T> mapper, Object... params) {
-        // Adapt SQL to current database dialect if enabled
-        if (adaptSqlDialect) {
-            sql = adaptSql(sql);
-        }
-        
+    public <T> List<T> query(String sql, ResultMapper<T> mapper, Object... params) throws SQLException {
+        long startTime = System.currentTimeMillis();
         List<T> results = new ArrayList<>();
         
-        try (Connection connection = connectionManager.getConnection();
-             PreparedStatement statement = prepareStatement(connection, sql, params);
-             ResultSet resultSet = statement.executeQuery()) {
+        // Validate query for security
+        queryValidator.validateQuery(sql);
+        
+        try (Connection conn = getConnection();
+             PreparedStatement stmt = prepareStatement(conn, sql, params);
+             ResultSet rs = stmt.executeQuery()) {
             
-            // Process the results
-            ResultSetMetaData metaData = resultSet.getMetaData();
-            int columnCount = metaData.getColumnCount();
-            
-            while (resultSet.next()) {
-                Map<String, Object> row = new HashMap<>();
-                
-                // Map column names to values
-                for (int i = 1; i <= columnCount; i++) {
-                    String columnName = metaData.getColumnLabel(i);
-                    Object value = resultSet.getObject(i);
-                    row.put(columnName, value);
-                }
-                
-                // Apply mapper function
-                results.add(mapper.apply(row));
+            while (rs.next()) {
+                ResultRow resultRow = new DefaultResultRow(rs);
+                results.add(mapper.map(resultRow));
             }
+            
+            // Record query statistics
+            long endTime = System.currentTimeMillis();
+            queryStatistics.recordQuery(sql, endTime - startTime);
             
             return results;
         } catch (SQLException e) {
-            LogUtil.severe("Error executing query: " + e.getMessage());
-            LogUtil.severe("SQL: " + sql);
-            LogUtil.debug("Parameters: " + String.join(", ", convertParamsToStrings(params)));
-            e.printStackTrace();
-            return new ArrayList<>();
+            LogUtil.severe("SQL error executing query: " + e.getMessage());
+            queryStatistics.recordFailedQuery(sql);
+            throw e;
         }
     }
 
     @Override
-    public <T> Optional<T> queryFirst(String sql, Function<Map<String, Object>, T> mapper, Object... params) {
-        // Adapt SQL to current database dialect if enabled
-        if (adaptSqlDialect) {
-            sql = adaptSql(sql);
-        }
-        
+    public <T> CompletableFuture<List<T>> queryAsync(String sql, ResultMapper<T> mapper, Object... params) {
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                return query(sql, mapper, params);
+            } catch (SQLException e) {
+                throw new DatabaseException("Error executing async query", e);
+            }
+        }, asyncExecutor);
+    }
+
+    @Override
+    public <T> Optional<T> queryFirst(String sql, ResultMapper<T> mapper, Object... params) throws SQLException {
         List<T> results = query(sql, mapper, params);
         return results.isEmpty() ? Optional.empty() : Optional.of(results.get(0));
     }
 
     @Override
-    public int update(String sql, Object... params) {
-        // Adapt SQL to current database dialect if enabled
-        if (adaptSqlDialect) {
-            sql = adaptSql(sql);
-        }
-        
-        try (Connection connection = connectionManager.getConnection();
-             PreparedStatement statement = prepareStatement(connection, sql, params)) {
-            
-            return statement.executeUpdate();
-        } catch (SQLException e) {
-            LogUtil.severe("Error executing update: " + e.getMessage());
-            LogUtil.severe("SQL: " + sql);
-            LogUtil.debug("Parameters: " + String.join(", ", convertParamsToStrings(params)));
-            e.printStackTrace();
-            return 0;
-        }
+    public <T> CompletableFuture<Optional<T>> queryFirstAsync(String sql, ResultMapper<T> mapper, Object... params) {
+        return queryAsync(sql, mapper, params)
+                .thenApply(results -> results.isEmpty() ? Optional.empty() : Optional.of(results.get(0)));
     }
 
     @Override
-    public long insert(String sql, Object... params) throws SQLException {
-        // Adapt SQL to current database dialect if enabled
-        if (adaptSqlDialect) {
-            sql = adaptSql(sql);
-        }
+    public int update(String sql, Object... params) throws SQLException {
+        long startTime = System.currentTimeMillis();
         
-        Connection connection = null;
-        PreparedStatement statement = null;
-        ResultSet generatedKeys = null;
+        // Validate query for security
+        queryValidator.validateQuery(sql);
         
-        try {
-            connection = connectionManager.getConnection();
-            statement = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS);
+        try (Connection conn = getConnection();
+             PreparedStatement stmt = prepareStatement(conn, sql, params)) {
             
-            // Set parameters
-            for (int i = 0; i < params.length; i++) {
-                statement.setObject(i + 1, params[i]);
-            }
+            int rowsAffected = stmt.executeUpdate();
             
-            // Execute the insert
-            statement.executeUpdate();
+            // Record query statistics
+            long endTime = System.currentTimeMillis();
+            queryStatistics.recordUpdate(sql, endTime - startTime);
             
-            // Get the generated key
-            generatedKeys = statement.getGeneratedKeys();
-            if (generatedKeys.next()) {
-                return generatedKeys.getLong(1);
-            } else {
-                // Try to get the last insert ID using dialect-specific SQL
-                try (Statement idStatement = connection.createStatement();
-                     ResultSet idResult = idStatement.executeQuery(
-                         connectionManager.getDialect().getLastInsertId())) {
-                    
-                    if (idResult.next()) {
-                        return idResult.getLong(1);
-                    }
-                }
-                
-                return -1;
-            }
+            return rowsAffected;
         } catch (SQLException e) {
-            LogUtil.severe("Error executing insert: " + e.getMessage());
-            LogUtil.severe("SQL: " + sql);
-            LogUtil.debug("Parameters: " + String.join(", ", convertParamsToStrings(params)));
+            LogUtil.severe("SQL error executing update: " + e.getMessage());
+            queryStatistics.recordFailedUpdate(sql);
             throw e;
-        } finally {
-            // Close resources
-            if (generatedKeys != null) {
-                try {
-                    generatedKeys.close();
-                } catch (SQLException e) {
-                    // Ignore
-                }
-            }
-            if (statement != null) {
-                try {
-                    statement.close();
-                } catch (SQLException e) {
-                    // Ignore
-                }
-            }
-            if (connection != null) {
-                try {
-                    connection.close();
-                } catch (SQLException e) {
-                    // Ignore
-                }
-            }
         }
     }
 
     @Override
-    public <T> T transaction(Transaction<T> transaction) {
-        Connection connection = null;
-        boolean originalAutoCommit = false;
+    public CompletableFuture<Integer> updateAsync(String sql, Object... params) {
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                return update(sql, params);
+            } catch (SQLException e) {
+                throw new DatabaseException("Error executing async update", e);
+            }
+        }, asyncExecutor);
+    }
+
+    @Override
+    public int[] batchUpdate(String sql, List<Object[]> parameterSets) throws SQLException {
+        long startTime = System.currentTimeMillis();
+        
+        // Validate query for security
+        queryValidator.validateQuery(sql);
+        
+        try (Connection conn = getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            
+            for (Object[] params : parameterSets) {
+                for (int i = 0; i < params.length; i++) {
+                    stmt.setObject(i + 1, params[i]);
+                }
+                stmt.addBatch();
+            }
+            
+            int[] results = stmt.executeBatch();
+            
+            // Record query statistics
+            long endTime = System.currentTimeMillis();
+            queryStatistics.recordBatchUpdate(sql, parameterSets.size(), endTime - startTime);
+            
+            return results;
+        } catch (SQLException e) {
+            LogUtil.severe("SQL error executing batch update: " + e.getMessage());
+            queryStatistics.recordFailedBatchUpdate(sql);
+            throw e;
+        }
+    }
+
+    @Override
+    public CompletableFuture<int[]> batchUpdateAsync(String sql, List<Object[]> parameterSets) {
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                return batchUpdate(sql, parameterSets);
+            } catch (SQLException e) {
+                throw new DatabaseException("Error executing async batch update", e);
+            }
+        }, asyncExecutor);
+    }
+
+    @Override
+    public SelectBuilder select() {
+        return new DefaultSelectBuilder(this);
+    }
+
+    @Override
+    public InsertBuilder insertInto(String table) {
+        return new DefaultInsertBuilder(this, table);
+    }
+
+    @Override
+    public UpdateBuilder update(String table) {
+        return new DefaultUpdateBuilder(this, table);
+    }
+
+    @Override
+    public QueryBuilder createQuery() {
+        return new DefaultQueryBuilder(this);
+    }
+
+    @Override
+    public <T> T executeTransaction(Transaction<T> transactionFunction) throws SQLException {
+        Connection conn = null;
+        boolean originalAutoCommit = true;
         
         try {
-            // Get a connection and disable auto-commit
-            connection = connectionManager.getConnection();
-            originalAutoCommit = connection.getAutoCommit();
-            connection.setAutoCommit(false);
+            conn = getConnection();
+            originalAutoCommit = conn.getAutoCommit();
+            conn.setAutoCommit(false);
             
-            // Execute the transaction
-            T result = transaction.execute(connection);
+            T result = transactionFunction.execute(conn);
             
-            // Commit the transaction
-            connection.commit();
-            
+            conn.commit();
             return result;
-        } catch (SQLException e) {
-            // Rollback the transaction
-            if (connection != null) {
+        } catch (Exception e) {
+            if (conn != null) {
                 try {
-                    connection.rollback();
+                    conn.rollback();
                 } catch (SQLException rollbackEx) {
                     LogUtil.severe("Error rolling back transaction: " + rollbackEx.getMessage());
-                    rollbackEx.printStackTrace();
                 }
             }
             
-            LogUtil.severe("Error executing transaction: " + e.getMessage());
-            e.printStackTrace();
-            
-            // Rethrow as runtime exception
-            throw new RuntimeException("Transaction failed", e);
+            if (e instanceof SQLException) {
+                throw (SQLException) e;
+            } else {
+                throw new DatabaseException("Error executing transaction", e);
+            }
         } finally {
-            // Restore auto-commit and close the connection
-            if (connection != null) {
+            if (conn != null) {
                 try {
-                    connection.setAutoCommit(originalAutoCommit);
-                    connection.close();
-                } catch (SQLException e) {
-                    LogUtil.warning("Error closing connection: " + e.getMessage());
+                    conn.setAutoCommit(originalAutoCommit);
+                    conn.close();
+                } catch (SQLException closeEx) {
+                    LogUtil.warning("Error closing connection: " + closeEx.getMessage());
                 }
             }
+        }
+    }
+
+    @Override
+    public <T> CompletableFuture<T> executeTransactionAsync(Transaction<T> transactionFunction) {
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                return executeTransaction(transactionFunction);
+            } catch (SQLException e) {
+                throw new DatabaseException("Error executing async transaction", e);
+            }
+        }, asyncExecutor);
+    }
+
+    @Override
+    public void executeQuery(String sql, Consumer<ResultRow> resultConsumer, Object... params) throws SQLException {
+        long startTime = System.currentTimeMillis();
+        
+        // Validate query for security
+        queryValidator.validateQuery(sql);
+        
+        try (Connection conn = getConnection();
+             PreparedStatement stmt = prepareStatement(conn, sql, params);
+             ResultSet rs = stmt.executeQuery()) {
+            
+            while (rs.next()) {
+                ResultRow resultRow = new DefaultResultRow(rs);
+                resultConsumer.accept(resultRow);
+            }
+            
+            // Record query statistics
+            long endTime = System.currentTimeMillis();
+            queryStatistics.recordQuery(sql, endTime - startTime);
+        } catch (SQLException e) {
+            LogUtil.severe("SQL error executing query with consumer: " + e.getMessage());
+            queryStatistics.recordFailedQuery(sql);
+            throw e;
         }
     }
 
     @Override
     public Connection getConnection() throws SQLException {
-        return connectionManager.getConnection();
+        try {
+            return dataSource.getConnection();
+        } catch (SQLException e) {
+            LogUtil.severe("Failed to get database connection: " + e.getMessage());
+            throw e;
+        }
     }
 
     @Override
     public boolean isConnectionValid() {
-        try (Connection connection = connectionManager.getConnection()) {
-            return connection != null && connection.isValid(3);
+        try (Connection conn = getConnection()) {
+            return conn != null && conn.isValid(5);
         } catch (SQLException e) {
-            LogUtil.warning("Connection validation failed: " + e.getMessage());
+            LogUtil.warning("Connection validity check failed: " + e.getMessage());
             return false;
         }
     }
 
     @Override
-    public QueryBuilder createQueryBuilder() {
-        return new DefaultQueryBuilder(connectionManager.getDialect());
-    }
-
-    @Override
-    public DatabaseType getType() {
-        return connectionManager.getType();
+    public Map<String, Object> getStatistics() {
+        Map<String, Object> stats = new HashMap<>();
+        stats.putAll(queryStatistics.getStatistics());
+        return stats;
     }
 
     /**
-     * Create a prepared statement with parameters
+     * Prepare a statement with parameters.
      *
-     * @param connection The database connection
-     * @param sql The SQL statement
-     * @param params The parameters
+     * @param conn The database connection
+     * @param sql The SQL query
+     * @param params The parameters for the query
      * @return A prepared statement
-     * @throws SQLException If there's an error preparing the statement
+     * @throws SQLException If an error occurs during preparation
      */
-    private PreparedStatement prepareStatement(Connection connection, String sql, Object... params) throws SQLException {
-        PreparedStatement statement = connection.prepareStatement(sql);
+    private PreparedStatement prepareStatement(Connection conn, String sql, Object... params) throws SQLException {
+        PreparedStatement stmt = conn.prepareStatement(sql);
         
-        // Set parameters
         for (int i = 0; i < params.length; i++) {
-            statement.setObject(i + 1, params[i]);
+            stmt.setObject(i + 1, params[i]);
         }
         
-        return statement;
+        return stmt;
     }
 
     /**
-     * Convert query parameters to strings for logging
-     *
-     * @param params The parameters
-     * @return Array of parameter strings
+     * Close the database and free resources.
+     * This should be called when the plugin is disabled.
      */
-    private String[] convertParamsToStrings(Object... params) {
-        String[] strings = new String[params.length];
-        for (int i = 0; i < params.length; i++) {
-            strings[i] = params[i] == null ? "null" : params[i].toString();
-        }
-        return strings;
+    public void close() {
+        // The connection pool will be closed by the ConnectionManager
+        LogUtil.info("Database closed.");
     }
-    
+
     /**
-     * Adapt SQL to the current database dialect
-     *
-     * @param sql The SQL statement to adapt
-     * @return The adapted SQL statement
+     * Default implementation of ResultRow.
      */
-    private String adaptSql(String sql) {
-        DatabaseType dbType = connectionManager.getType();
-        String adaptedSql = SqlDialectAdapter.adaptSql(sql, dbType);
+    private static class DefaultResultRow implements ResultRow {
+        private final ResultSet resultSet;
+
+        public DefaultResultRow(ResultSet resultSet) {
+            this.resultSet = resultSet;
+        }
+
+        @Override
+        public String getString(String columnName) throws SQLException {
+            return resultSet.getString(columnName);
+        }
+
+        @Override
+        public int getInt(String columnName) throws SQLException {
+            return resultSet.getInt(columnName);
+        }
+
+        @Override
+        public long getLong(String columnName) throws SQLException {
+            return resultSet.getLong(columnName);
+        }
+
+        @Override
+        public double getDouble(String columnName) throws SQLException {
+            return resultSet.getDouble(columnName);
+        }
+
+        @Override
+        public boolean getBoolean(String columnName) throws SQLException {
+            return resultSet.getBoolean(columnName);
+        }
+
+        @Override
+        public byte[] getBytes(String columnName) throws SQLException {
+            return resultSet.getBytes(columnName);
+        }
+
+        @Override
+        public java.sql.Date getDate(String columnName) throws SQLException {
+            return resultSet.getDate(columnName);
+        }
+
+        @Override
+        public java.sql.Timestamp getTimestamp(String columnName) throws SQLException {
+            return resultSet.getTimestamp(columnName);
+        }
+
+        @Override
+        public Object getObject(String columnName) throws SQLException {
+            return resultSet.getObject(columnName);
+        }
+
+        @Override
+        public boolean isNull(String columnName) throws SQLException {
+            return resultSet.getObject(columnName) == null;
+        }
+    }
+
+    /**
+     * Default implementation of SelectBuilder.
+     * This is a placeholder - the actual implementation would be more complex.
+     */
+    private class DefaultSelectBuilder implements SelectBuilder {
+        private final Database database;
         
-        // Log the conversion if debug is enabled and something changed
-        if (!sql.equals(adaptedSql) && plugin.getConfig().getBoolean("debug.log-queries", false)) {
-            SqlDialectAdapter.logConversion(sql, adaptedSql, dbType);
+        public DefaultSelectBuilder(Database database) {
+            this.database = database;
         }
         
-        return adaptedSql;
+        // Implementation would go here
+        // This is just a stub for now
     }
-    
-    // BatchOperations implementation
-    
-    @Override
-    public int[] batchInsert(String sql, List<Object[]> batchParams) {
-        // Adapt SQL to current database dialect if enabled
-        if (adaptSqlDialect) {
-            sql = adaptSql(sql);
+
+    /**
+     * Default implementation of InsertBuilder.
+     * This is a placeholder - the actual implementation would be more complex.
+     */
+    private class DefaultInsertBuilder implements InsertBuilder {
+        private final Database database;
+        private final String table;
+        
+        public DefaultInsertBuilder(Database database, String table) {
+            this.database = database;
+            this.table = table;
         }
-        return batchOperations.batchInsert(sql, batchParams);
+        
+        // Implementation would go here
+        // This is just a stub for now
     }
-    
-    @Override
-    public int[] batchUpdate(String sql, List<Object[]> batchParams) {
-        // Adapt SQL to current database dialect if enabled
-        if (adaptSqlDialect) {
-            sql = adaptSql(sql);
+
+    /**
+     * Default implementation of UpdateBuilder.
+     * This is a placeholder - the actual implementation would be more complex.
+     */
+    private class DefaultUpdateBuilder implements UpdateBuilder {
+        private final Database database;
+        private final String table;
+        
+        public DefaultUpdateBuilder(Database database, String table) {
+            this.database = database;
+            this.table = table;
         }
-        return batchOperations.batchUpdate(sql, batchParams);
+        
+        // Implementation would go here
+        // This is just a stub for now
     }
-    
-    @Override
-    public boolean executeBatch(List<String> statements) {
-        // Adapt each statement to current database dialect if enabled
-        if (adaptSqlDialect) {
-            List<String> adaptedStatements = new ArrayList<>();
-            for (String statement : statements) {
-                adaptedStatements.add(adaptSql(statement));
-            }
-            return batchOperations.executeBatch(adaptedStatements);
+
+    /**
+     * Default implementation of QueryBuilder.
+     * This is a placeholder - the actual implementation would be more complex.
+     */
+    private class DefaultQueryBuilder implements QueryBuilder {
+        private final Database database;
+        
+        public DefaultQueryBuilder(Database database) {
+            this.database = database;
         }
-        return batchOperations.executeBatch(statements);
-    }
-    
-    @Override
-    public <T> int[] batchInsertObjects(String tableName, String[] columns, List<T> objects, Function<T, Object[]> mapper) {
-        return batchOperations.batchInsertObjects(tableName, columns, objects, mapper);
-    }
-    
-    @Override
-    public <T> int[] batchUpdateObjects(String tableName, String[] columns, String idColumn, List<T> objects, Function<T, Object[]> mapper) {
-        return batchOperations.batchUpdateObjects(tableName, columns, idColumn, objects, mapper);
-    }
-    
-    @Override
-    public <T> List<List<T>> batchQuery(String sql, List<Object[]> batchParams, Function<Map<String, Object>, T> mapper) {
-        // Adapt SQL to current database dialect if enabled
-        if (adaptSqlDialect) {
-            sql = adaptSql(sql);
-        }
-        return batchOperations.batchQuery(sql, batchParams, mapper);
+        
+        // Implementation would go here
+        // This is just a stub for now
     }
 }

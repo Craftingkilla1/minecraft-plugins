@@ -1,4 +1,4 @@
-package com.minecraft.invitesystem.utils;
+package com.minecraft.core.utils;
 
 import org.bukkit.ChatColor;
 

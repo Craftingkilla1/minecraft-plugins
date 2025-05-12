@@ -1,16 +1,33 @@
 description = 'Example plugin demonstrating Core-Utils and SQL-Bridge integration'
 
-// Override group for this project
-group = 'com.example'
+// Override group for this project if needed
+// group = 'com.example'
 
-// Version is managed by the VersioningPlugin
+// The version is automatically set by the VersioningPlugin
 
 dependencies {
-    // For development, use project dependencies
+    // Add Core-Utils and SQL-Bridge as project dependencies
     compileOnly project(':Core-Utils')
     compileOnly project(':Sql-Bridge')
+    
+    // Add any Example-Plugin specific dependencies here
 }
 
 shadowJar {
-    archiveBaseName.set('ExamplePlugin')
+    // Set the output file name with correct naming convention
+    archiveBaseName.set('example-plugin')
+}
+
+// Optional: Add specific publication configuration if needed
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            // Set correct artifact coordinates
+            // Using com.minecraft group to match the other plugins
+            groupId = 'com.minecraft'
+            artifactId = 'example-plugin'
+            
+            // The rest is inherited from the parent build.gradle
+        }
+    }
 }

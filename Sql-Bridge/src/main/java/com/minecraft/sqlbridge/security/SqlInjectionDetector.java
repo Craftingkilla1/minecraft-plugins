@@ -1,255 +1,214 @@
+// ./Sql-Bridge/src/main/java/com/minecraft/sqlbridge/security/SQLInjectionDetector.java
 package com.minecraft.sqlbridge.security;
 
 import com.minecraft.core.utils.LogUtil;
 import com.minecraft.sqlbridge.SqlBridgePlugin;
+import com.minecraft.sqlbridge.error.DatabaseException;
 
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Advanced SQL injection detection system.
- * Provides methods to detect and log SQL injection attempts.
+ * Detects potential SQL injection attempts in queries.
  */
-public class SqlInjectionDetector {
+public class SQLInjectionDetector {
+
+    // Common SQL injection patterns
+    private static final List<Pattern> INJECTION_PATTERNS = new ArrayList<>();
+    
+    // Initialize patterns
+    static {
+        // Multiple statements (;)
+        INJECTION_PATTERNS.add(Pattern.compile(";\\s*\\w+\\s*", Pattern.CASE_INSENSITIVE));
+        
+        // Comments (-- or /* */) used to terminate statements
+        INJECTION_PATTERNS.add(Pattern.compile("--.*|/\\*.*?\\*/", Pattern.CASE_INSENSITIVE | Pattern.DOTALL));
+        
+        // UNION-based injections
+        INJECTION_PATTERNS.add(Pattern.compile("\\bunion\\b.*?\\bselect\\b", Pattern.CASE_INSENSITIVE));
+        
+        // Time-based blind injections
+        INJECTION_PATTERNS.add(Pattern.compile("\\bbenchmark\\b\\s*\\(|\\bsleep\\b\\s*\\(|\\bwaitfor\\b\\s*\\b(delay|time)\\b", 
+                Pattern.CASE_INSENSITIVE));
+        
+        // Generic string truncation to bypass filters
+        INJECTION_PATTERNS.add(Pattern.compile("\\bor\\b\\s+'\\s*[0-9]\\s*'\\s*=\\s*'\\s*[0-9]", Pattern.CASE_INSENSITIVE));
+        
+        // Basic OR injections
+        INJECTION_PATTERNS.add(Pattern.compile("\\bor\\b\\s+[0-9]\\s*=\\s*[0-9]\\b", Pattern.CASE_INSENSITIVE));
+        
+        // Basic AND injections
+        INJECTION_PATTERNS.add(Pattern.compile("\\band\\b\\s+[0-9]\\s*=\\s*[0-9]\\b", Pattern.CASE_INSENSITIVE));
+        
+        // Common table/schema enumeration
+        INJECTION_PATTERNS.add(Pattern.compile("\\bfrom\\b\\s+\\binformation_schema\\b\\.\\btables\\b", 
+                Pattern.CASE_INSENSITIVE));
+        
+        // Error-based injections
+        INJECTION_PATTERNS.add(Pattern.compile("\\bconvert\\b\\s*\\(", Pattern.CASE_INSENSITIVE));
+        INJECTION_PATTERNS.add(Pattern.compile("\\bcast\\b\\s*\\(", Pattern.CASE_INSENSITIVE));
+    }
 
     private final SqlBridgePlugin plugin;
-    private boolean enabled;
-    private boolean blockQueries;
-    private boolean logAttempts;
-    private boolean notifyAdmins;
     
-    // Collection of SQL injection patterns
-    private static final Pattern[] INJECTION_PATTERNS = {
-        // Basic SQL injection
-        Pattern.compile("'\\s*OR\\s*'?\\s*'?\\s*'?\\s*=\\s*'?\\s*'?\\s*'", Pattern.CASE_INSENSITIVE),
-        Pattern.compile("'\\s*OR\\s*[0-9]+=\\s*[0-9]+", Pattern.CASE_INSENSITIVE),
-        Pattern.compile("'\\s*OR\\s*'x'='x", Pattern.CASE_INSENSITIVE),
-        
-        // Comment-based SQL injection
-        Pattern.compile("--\\s+", Pattern.CASE_INSENSITIVE),
-        Pattern.compile("\\/\\*.*?\\*\\/", Pattern.CASE_INSENSITIVE),
-        
-        // UNION-based SQL injection
-        Pattern.compile("UNION\\s+ALL\\s+SELECT", Pattern.CASE_INSENSITIVE),
-        Pattern.compile("UNION\\s+SELECT", Pattern.CASE_INSENSITIVE),
-        
-        // Batch SQL injection
-        Pattern.compile(";\\s*\\w+\\s*", Pattern.CASE_INSENSITIVE),
-        
-        // Boolean-based SQL injection
-        Pattern.compile("AND\\s+[0-9]+=\\s*[0-9]+", Pattern.CASE_INSENSITIVE),
-        
-        // Time-based SQL injection
-        Pattern.compile("SLEEP\\s*\\(\\s*[0-9]+\\s*\\)", Pattern.CASE_INSENSITIVE),
-        Pattern.compile("WAITFOR\\s+DELAY", Pattern.CASE_INSENSITIVE),
-        Pattern.compile("BENCHMARK\\s*\\(", Pattern.CASE_INSENSITIVE),
-        
-        // Error-based SQL injection
-        Pattern.compile("CONVERT\\s*\\(", Pattern.CASE_INSENSITIVE),
-        Pattern.compile("CAST\\s*\\(", Pattern.CASE_INSENSITIVE)
-    };
-    
-    // Store recent injection attempts
-    private final List<InjectionAttempt> recentAttempts = new ArrayList<>();
-    private final Map<String, Integer> attemptsByIp = new HashMap<>();
-    private static final int MAX_RECENT_ATTEMPTS = 50;
-
     /**
-     * Create a new SQL injection detector
+     * Constructor for SQLInjectionDetector.
      *
      * @param plugin The SQL-Bridge plugin instance
      */
-    public SqlInjectionDetector(SqlBridgePlugin plugin) {
+    public SQLInjectionDetector(SqlBridgePlugin plugin) {
         this.plugin = plugin;
-        reloadConfig();
     }
-
+    
     /**
-     * Reload configuration from the plugin config
-     */
-    public void reloadConfig() {
-        this.enabled = plugin.getConfig().getBoolean("security.injection-detection.enabled", true);
-        this.blockQueries = plugin.getConfig().getBoolean("security.injection-detection.block-queries", true);
-        this.logAttempts = plugin.getConfig().getBoolean("security.injection-detection.log-attempts", true);
-        this.notifyAdmins = plugin.getConfig().getBoolean("security.injection-detection.notify-admins", true);
-    }
-
-    /**
-     * Check if a query contains potential SQL injection
+     * Check if a query contains potential SQL injection attempts.
      *
-     * @param query The SQL query to check
-     * @param source The source of the query (plugin name, etc.)
-     * @param ip The IP address of the request (if applicable, can be null)
-     * @return True if injection is detected, false otherwise
+     * @param sql The SQL query to check
+     * @param parameters The query parameters
+     * @return true if the query is safe, false if potential injection is detected
      */
-    public boolean detectInjection(String query, String source, String ip) {
-        if (!enabled || query == null || query.isEmpty()) {
+    public boolean isSafe(String sql, Object... parameters) {
+        if (sql == null || sql.isEmpty()) {
             return false;
         }
         
-        // Apply patterns to detect injections
+        // Check for common SQL injection patterns in query
         for (Pattern pattern : INJECTION_PATTERNS) {
-            Matcher matcher = pattern.matcher(query);
+            Matcher matcher = pattern.matcher(sql);
             if (matcher.find()) {
-                // SQL injection detected
-                handleInjectionAttempt(query, pattern.pattern(), source, ip);
+                String match = matcher.group(0);
+                LogUtil.severe("Potential SQL injection detected: " + match + " in query: " + sql);
+                return false;
+            }
+        }
+        
+        // Check parameters for potential injection strings
+        if (parameters != null) {
+            for (Object param : parameters) {
+                if (param instanceof String) {
+                    String strParam = (String) param;
+                    if (isParameterSuspicious(strParam)) {
+                        LogUtil.severe("Suspicious SQL parameter detected: " + strParam);
+                        return false;
+                    }
+                }
+            }
+        }
+        
+        return true;
+    }
+    
+    /**
+     * Check if a parameter string looks suspicious.
+     *
+     * @param param The parameter string to check
+     * @return true if the parameter is suspicious, false otherwise
+     */
+    private boolean isParameterSuspicious(String param) {
+        if (param == null || param.isEmpty()) {
+            return false;
+        }
+        
+        // List of suspicious strings that might indicate SQL injection
+        List<String> suspiciousStrings = Arrays.asList(
+            ";", "--", "/*", "*/", "union select", "drop table", "drop database",
+            "delete from", "truncate table", "1=1", "or 1=1", "or 1 = 1", 
+            "' or '", "' or 1=1", "\" or \"", "\" or 1=1"
+        );
+        
+        String lowerParam = param.toLowerCase();
+        for (String suspicious : suspiciousStrings) {
+            if (lowerParam.contains(suspicious)) {
                 return true;
             }
         }
         
-        // Check for additional signs of SQL injection using the SqlSanitizer
-        if (SqlSanitizer.isSqlInjectionAttempt(query)) {
-            handleInjectionAttempt(query, "Advanced detection", source, ip);
-            return true;
-        }
-        
         return false;
     }
-
+    
     /**
-     * Handle a detected SQL injection attempt
+     * Sanitize a raw SQL query to prevent SQL injection.
+     * This should be used with caution and only for non-parameterized queries.
      *
-     * @param query The SQL query containing the injection
-     * @param pattern The pattern that matched
-     * @param source The source of the query
-     * @param ip The IP address (can be null)
+     * @param sql The SQL query to sanitize
+     * @return The sanitized SQL query
      */
-    private void handleInjectionAttempt(String query, String pattern, String source, String ip) {
-        // Log the attempt
-        if (logAttempts) {
-            LogUtil.severe("SQL INJECTION ATTEMPT DETECTED!");
-            LogUtil.severe("Query: " + query);
-            LogUtil.severe("Pattern: " + pattern);
-            LogUtil.severe("Source: " + source);
-            if (ip != null) {
-                LogUtil.severe("IP: " + ip);
-            }
+    public String sanitize(String sql) {
+        if (sql == null || sql.isEmpty()) {
+            return "";
         }
         
-        // Record the attempt
-        InjectionAttempt attempt = new InjectionAttempt(
-                System.currentTimeMillis(),
-                query,
-                pattern,
-                source,
-                ip
-        );
+        // Replace dangerous characters
+        String sanitized = sql.replaceAll(";", "")  // No multiple statements
+                             .replaceAll("--", "")  // No SQL comments
+                             .replaceAll("/\\*.*?\\*/", "")  // No block comments
+                             .replaceAll("'", "''") // Escape single quotes
+                             .trim();
         
-        synchronized (recentAttempts) {
-            recentAttempts.add(attempt);
-            if (recentAttempts.size() > MAX_RECENT_ATTEMPTS) {
-                recentAttempts.remove(0);
-            }
-        }
-        
-        // Track attempts by IP
-        if (ip != null) {
-            synchronized (attemptsByIp) {
-                attemptsByIp.put(ip, attemptsByIp.getOrDefault(ip, 0) + 1);
-            }
-        }
-        
-        // Notify admins if enabled
-        if (notifyAdmins) {
-            plugin.getServer().getOnlinePlayers().stream()
-                    .filter(player -> player.hasPermission("sqlbridge.admin"))
-                    .forEach(admin -> admin.sendMessage(
-                            "§c[SQL-Bridge] SQL Injection Attempt Detected from " + 
-                            (source != null ? source : "unknown source") +
-                            (ip != null ? " (" + ip + ")" : "")
-                    ));
-        }
+        return sanitized;
     }
-
+    
     /**
-     * Get a list of recent injection attempts
+     * Sanitize a parameter for use in a SQL query.
+     * This should be used with caution and only when proper parameterization is not possible.
      *
-     * @return List of recent injection attempts
+     * @param param The parameter to sanitize
+     * @return The sanitized parameter
      */
-    public List<InjectionAttempt> getRecentAttempts() {
-        synchronized (recentAttempts) {
-            return new ArrayList<>(recentAttempts);
-        }
-    }
-
-    /**
-     * Check if queries should be blocked when injection is detected
-     *
-     * @return True if queries should be blocked
-     */
-    public boolean shouldBlockQueries() {
-        return enabled && blockQueries;
-    }
-
-    /**
-     * Clear all recorded injection attempts
-     */
-    public void clearAttempts() {
-        synchronized (recentAttempts) {
-            recentAttempts.clear();
+    public String sanitizeParameter(String param) {
+        if (param == null || param.isEmpty()) {
+            return "";
         }
         
-        synchronized (attemptsByIp) {
-            attemptsByIp.clear();
-        }
+        // Escape special characters
+        String sanitized = param.replaceAll("'", "''")  // Escape single quotes
+                               .replaceAll("\"", "\"\"")  // Escape double quotes
+                               .replaceAll("\\\\", "\\\\\\\\")  // Escape backslashes
+                               .trim();
+        
+        return sanitized;
     }
-
+    
     /**
-     * Get the number of attempts from a specific IP
+     * Validate and sanitize a table name to prevent SQL injection.
      *
-     * @param ip The IP address
-     * @return The number of attempts
+     * @param tableName The table name to validate
+     * @return The sanitized table name
+     * @throws DatabaseException If the table name contains invalid characters
      */
-    public int getAttemptsFromIp(String ip) {
-        if (ip == null) {
-            return 0;
+    public String validateTableName(String tableName) {
+        if (tableName == null || tableName.isEmpty()) {
+            throw new DatabaseException("Table name cannot be null or empty");
         }
         
-        synchronized (attemptsByIp) {
-            return attemptsByIp.getOrDefault(ip, 0);
+        // Check for valid table name (alphanumeric and underscores only)
+        if (!tableName.matches("^[a-zA-Z0-9_]+$")) {
+            throw new DatabaseException("Invalid table name: " + tableName);
         }
+        
+        return tableName;
     }
-
+    
     /**
-     * Inner class to represent an injection attempt
+     * Validate and sanitize a column name to prevent SQL injection.
+     *
+     * @param columnName The column name to validate
+     * @return The sanitized column name
+     * @throws DatabaseException If the column name contains invalid characters
      */
-    public static class InjectionAttempt {
-        private final long timestamp;
-        private final String query;
-        private final String pattern;
-        private final String source;
-        private final String ip;
-
-        public InjectionAttempt(long timestamp, String query, String pattern, String source, String ip) {
-            this.timestamp = timestamp;
-            this.query = query;
-            this.pattern = pattern;
-            this.source = source;
-            this.ip = ip;
+    public String validateColumnName(String columnName) {
+        if (columnName == null || columnName.isEmpty()) {
+            throw new DatabaseException("Column name cannot be null or empty");
         }
-
-        public long getTimestamp() {
-            return timestamp;
+        
+        // Check for valid column name (alphanumeric and underscores only)
+        if (!columnName.matches("^[a-zA-Z0-9_]+$")) {
+            throw new DatabaseException("Invalid column name: " + columnName);
         }
-
-        public String getQuery() {
-            return query;
-        }
-
-        public String getPattern() {
-            return pattern;
-        }
-
-        public String getSource() {
-            return source;
-        }
-
-        public String getIp() {
-            return ip;
-        }
+        
+        return columnName;
     }
 }

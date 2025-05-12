@@ -1,178 +1,133 @@
+// ./Sql-Bridge/src/main/java/com/minecraft/sqlbridge/dialect/MySQLDialect.java
 package com.minecraft.sqlbridge.dialect;
 
-import java.text.SimpleDateFormat;
-import java.util.Date;
-import java.util.StringJoiner;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
- * MySQL-specific implementation of the SQL dialect.
+ * MySQL database dialect implementation.
  */
 public class MySQLDialect implements Dialect {
-
+    
+    private static final Set<DialectFeature> SUPPORTED_FEATURES = new HashSet<>(Arrays.asList(
+        DialectFeature.MULTI_ROW_INSERT,
+        DialectFeature.UPSERT,
+        DialectFeature.DROP_IF_EXISTS,
+        DialectFeature.BATCH_PARAMETERS,
+        DialectFeature.LIMIT_OFFSET,
+        DialectFeature.FOREIGN_KEYS,
+        DialectFeature.RENAME_TABLE,
+        DialectFeature.FULLTEXT_SEARCH,
+        DialectFeature.JSON_SUPPORT
+    ));
+    
     @Override
-    public String createTable(String tableName, String... columns) {
-        StringBuilder sql = new StringBuilder("CREATE TABLE IF NOT EXISTS ");
-        sql.append(tableName).append(" (");
-        
-        StringJoiner joiner = new StringJoiner(", ");
-        for (String column : columns) {
-            joiner.add(column);
-        }
-        
-        sql.append(joiner.toString());
-        sql.append(") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
-        
-        return sql.toString();
+    public String getDatabaseType() {
+        return "mysql";
     }
-
+    
     @Override
-    public String dropTable(String tableName, boolean ifExists) {
-        if (ifExists) {
-            return "DROP TABLE IF EXISTS " + tableName;
+    public boolean supportsFeature(DialectFeature feature) {
+        return SUPPORTED_FEATURES.contains(feature);
+    }
+    
+    @Override
+    public String formatTableName(String tableName) {
+        // MySQL uses backticks for table names
+        return "`" + tableName + "`";
+    }
+    
+    @Override
+    public String formatColumnName(String columnName) {
+        // MySQL uses backticks for column names
+        return "`" + columnName + "`";
+    }
+    
+    @Override
+    public String getLimitClause(int limit, Integer offset) {
+        if (offset != null) {
+            return "LIMIT " + offset + ", " + limit;
         } else {
-            return "DROP TABLE " + tableName;
+            return "LIMIT " + limit;
         }
     }
-
+    
     @Override
-    public String createIndex(String indexName, String tableName, boolean unique, String... columns) {
-        StringBuilder sql = new StringBuilder();
-        sql.append("CREATE ");
+    public String getCreateDatabaseSQL(String databaseName) {
+        return "CREATE DATABASE IF NOT EXISTS `" + databaseName + 
+               "` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci";
+    }
+    
+    @Override
+    public String getCreateTableWithAutoIncrementSQL(String tableName, String primaryKeyColumn) {
+        return "CREATE TABLE IF NOT EXISTS " + formatTableName(tableName) + " (" +
+               formatColumnName(primaryKeyColumn) + " INT AUTO_INCREMENT PRIMARY KEY)";
+    }
+    
+    @Override
+    public String getPaginationSQL(String innerQuery, int page, int pageSize) {
+        int offset = (page - 1) * pageSize;
+        return innerQuery + " LIMIT " + offset + ", " + pageSize;
+    }
+    
+    @Override
+    public String getCaseInsensitiveLikeSQL(String column, String pattern) {
+        return column + " LIKE " + pattern + " COLLATE utf8mb4_unicode_ci";
+    }
+    
+    @Override
+    public String getParameterPlaceholder(int index) {
+        return "?";
+    }
+    
+    @Override
+    public String getCurrentTimestampSQL() {
+        return "NOW()";
+    }
+    
+    @Override
+    public String getRandomOrderSQL() {
+        return "RAND()";
+    }
+    
+    @Override
+    public String getIfExistsSQL() {
+        return "IF EXISTS";
+    }
+    
+    @Override
+    public String getBatchInsertSQL(String tableName, String[] columns, int batchSize) {
+        String columnList = Arrays.stream(columns)
+                                 .map(this::formatColumnName)
+                                 .collect(Collectors.joining(", "));
         
-        if (unique) {
-            sql.append("UNIQUE ");
-        }
+        StringBuilder sql = new StringBuilder("INSERT INTO ")
+                              .append(formatTableName(tableName))
+                              .append(" (").append(columnList).append(") VALUES ");
         
-        sql.append("INDEX ").append(indexName).append(" ON ").append(tableName).append(" (");
+        // Create placeholders for each row
+        String rowPlaceholders = "(" + 
+                                 Arrays.stream(columns)
+                                       .map(c -> "?")
+                                       .collect(Collectors.joining(", ")) + 
+                                 ")";
         
-        StringJoiner joiner = new StringJoiner(", ");
-        for (String column : columns) {
-            joiner.add(column);
-        }
-        
-        sql.append(joiner.toString());
-        sql.append(")");
-        
-        return sql.toString();
-    }
-
-    @Override
-    public String tableExists(String tableName) {
-        return "SELECT 1 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = '" + tableName + "' LIMIT 1";
-    }
-
-    @Override
-    public String getIntegerType(boolean autoIncrement) {
-        if (autoIncrement) {
-            return "INT NOT NULL AUTO_INCREMENT";
-        } else {
-            return "INT";
-        }
-    }
-
-    @Override
-    public String getLongType(boolean autoIncrement) {
-        if (autoIncrement) {
-            return "BIGINT NOT NULL AUTO_INCREMENT";
-        } else {
-            return "BIGINT";
-        }
-    }
-
-    @Override
-    public String getStringType(int length) {
-        if (length <= 0) {
-            return "TEXT";
-        } else if (length <= 255) {
-            return "VARCHAR(" + length + ")";
-        } else if (length <= 65535) {
-            return "TEXT";
-        } else if (length <= 16777215) {
-            return "MEDIUMTEXT";
-        } else {
-            return "LONGTEXT";
-        }
-    }
-
-    @Override
-    public String getBooleanType() {
-        return "TINYINT(1)";
-    }
-
-    @Override
-    public String getTimestampType() {
-        return "TIMESTAMP";
-    }
-
-    @Override
-    public String getBlobType() {
-        return "LONGBLOB";
-    }
-
-    @Override
-    public String formatValue(Object value) {
-        if (value == null) {
-            return "NULL";
-        } else if (value instanceof String) {
-            String str = (String) value;
-            return "'" + str.replace("'", "''") + "'";
-        } else if (value instanceof Date) {
-            SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
-            return "'" + format.format((Date) value) + "'";
-        } else if (value instanceof Boolean) {
-            return (Boolean) value ? "1" : "0";
-        } else {
-            return value.toString();
-        }
-    }
-
-    @Override
-    public String caseInsensitiveLike(String column, String value) {
-        return column + " LIKE " + formatValue(value) + " COLLATE utf8mb4_unicode_ci";
-    }
-
-    @Override
-    public String paginate(int limit, int offset) {
-        StringBuilder sql = new StringBuilder();
-        
-        if (limit > 0) {
-            sql.append(" LIMIT ").append(limit);
-        }
-        
-        if (offset > 0) {
-            sql.append(" OFFSET ").append(offset);
+        // Add placeholders for each batch row
+        for (int i = 0; i < batchSize; i++) {
+            if (i > 0) {
+                sql.append(", ");
+            }
+            sql.append(rowPlaceholders);
         }
         
         return sql.toString();
     }
-
+    
     @Override
-    public String getLastInsertId() {
-        return "SELECT LAST_INSERT_ID()";
-    }
-
-    @Override
-    public String formatDate(String column, String format) {
-        return "DATE_FORMAT(" + column + ", " + formatValue(format) + ")";
-    }
-
-    @Override
-    public String concat(String... parts) {
-        StringBuilder sql = new StringBuilder("CONCAT(");
-        
-        StringJoiner joiner = new StringJoiner(", ");
-        for (String part : parts) {
-            joiner.add(part);
-        }
-        
-        sql.append(joiner.toString());
-        sql.append(")");
-        
-        return sql.toString();
-    }
-
-    @Override
-    public String getName() {
-        return "MySQL";
+    public String getReturningClause(String columnName) {
+        // MySQL doesn't support RETURNING clause
+        return null;
     }
 }

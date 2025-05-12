@@ -1,103 +1,191 @@
+// ./Sql-Bridge/src/main/java/com/minecraft/sqlbridge/api/Database.java
 package com.minecraft.sqlbridge.api;
+
+import com.minecraft.sqlbridge.api.query.QueryBuilder;
+import com.minecraft.sqlbridge.api.query.SelectBuilder;
+import com.minecraft.sqlbridge.api.query.InsertBuilder;
+import com.minecraft.sqlbridge.api.query.UpdateBuilder;
+import com.minecraft.sqlbridge.api.result.ResultMapper;
+import com.minecraft.sqlbridge.api.result.ResultRow;
+import com.minecraft.sqlbridge.api.transaction.Transaction;
 
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.function.Function;
+import java.util.concurrent.CompletableFuture;
+import java.util.function.Consumer;
 
 /**
- * Main database interface providing methods for executing queries and transactions.
- * This interface is registered with the Core-Utils service registry for other plugins to use.
+ * Core interface for database operations.
+ * Provides methods for executing queries, updates, and managing transactions.
  */
 public interface Database {
-    
+
     /**
-     * Execute a query that returns a result
-     * 
+     * Execute a SQL query and map the results using the provided mapper.
+     *
      * @param sql The SQL query to execute
-     * @param mapper Function to map result set to object
-     * @param params Query parameters
-     * @param <T> Type of the returned object
-     * @return List of results
+     * @param mapper The mapper to convert result sets to objects
+     * @param params The query parameters
+     * @param <T> The type of objects to return
+     * @return A list of mapped objects
+     * @throws SQLException If an error occurs during execution
      */
-    <T> List<T> query(String sql, Function<Map<String, Object>, T> mapper, Object... params);
-    
+    <T> List<T> query(String sql, ResultMapper<T> mapper, Object... params) throws SQLException;
+
     /**
-     * Execute a query that returns a single result
-     * 
+     * Execute a SQL query asynchronously and map the results using the provided mapper.
+     *
      * @param sql The SQL query to execute
-     * @param mapper Function to map result set to object
-     * @param params Query parameters
-     * @param <T> Type of the returned object
-     * @return Optional containing the result, or empty if no result
+     * @param mapper The mapper to convert result sets to objects
+     * @param params The query parameters
+     * @param <T> The type of objects to return
+     * @return A CompletableFuture containing a list of mapped objects
      */
-    <T> Optional<T> queryFirst(String sql, Function<Map<String, Object>, T> mapper, Object... params);
-    
+    <T> CompletableFuture<List<T>> queryAsync(String sql, ResultMapper<T> mapper, Object... params);
+
     /**
-     * Execute an update query (INSERT, UPDATE, DELETE)
-     * 
+     * Execute a SQL query and return the first result, if any.
+     *
      * @param sql The SQL query to execute
-     * @param params Query parameters
-     * @return Number of affected rows
+     * @param mapper The mapper to convert result sets to objects
+     * @param params The query parameters
+     * @param <T> The type of object to return
+     * @return An Optional containing the first result, or empty if no results
+     * @throws SQLException If an error occurs during execution
      */
-    int update(String sql, Object... params);
-    
+    <T> Optional<T> queryFirst(String sql, ResultMapper<T> mapper, Object... params) throws SQLException;
+
     /**
-     * Execute an insert query and return the generated id
-     * 
+     * Execute a SQL query asynchronously and return the first result, if any.
+     *
      * @param sql The SQL query to execute
-     * @param params Query parameters
-     * @return The generated id, or -1 if no id was generated
+     * @param mapper The mapper to convert result sets to objects
+     * @param params The query parameters
+     * @param <T> The type of object to return
+     * @return A CompletableFuture containing an Optional with the first result, or empty if no results
      */
-    long insert(String sql, Object... params) throws SQLException;
-    
+    <T> CompletableFuture<Optional<T>> queryFirstAsync(String sql, ResultMapper<T> mapper, Object... params);
+
     /**
-     * Execute multiple statements in a single transaction
-     * 
-     * @param transaction The transaction to execute
-     * @param <T> Type of the returned object
-     * @return Result of the transaction
+     * Execute a SQL update query (INSERT, UPDATE, DELETE).
+     *
+     * @param sql The SQL update query to execute
+     * @param params The query parameters
+     * @return The number of rows affected
+     * @throws SQLException If an error occurs during execution
      */
-    <T> T transaction(Transaction<T> transaction);
-    
+    int update(String sql, Object... params) throws SQLException;
+
     /**
-     * Get a raw connection from the pool for advanced operations
-     * (Connection must be closed by the caller)
-     * 
-     * @return A database connection
+     * Execute a SQL update query asynchronously.
+     *
+     * @param sql The SQL update query to execute
+     * @param params The query parameters
+     * @return A CompletableFuture containing the number of rows affected
+     */
+    CompletableFuture<Integer> updateAsync(String sql, Object... params);
+
+    /**
+     * Execute a batch update with a list of parameter sets.
+     *
+     * @param sql The SQL update query to execute
+     * @param parameterSets The list of parameter sets, one for each batch execution
+     * @return An array containing the number of rows affected by each batch execution
+     * @throws SQLException If an error occurs during execution
+     */
+    int[] batchUpdate(String sql, List<Object[]> parameterSets) throws SQLException;
+
+    /**
+     * Execute a batch update asynchronously.
+     *
+     * @param sql The SQL update query to execute
+     * @param parameterSets The list of parameter sets, one for each batch execution
+     * @return A CompletableFuture containing an array with the number of rows affected by each batch execution
+     */
+    CompletableFuture<int[]> batchUpdateAsync(String sql, List<Object[]> parameterSets);
+
+    /**
+     * Create a new SELECT query builder.
+     *
+     * @return A new SelectBuilder instance
+     */
+    SelectBuilder select();
+
+    /**
+     * Create a new INSERT query builder.
+     *
+     * @param table The table to insert into
+     * @return A new InsertBuilder instance
+     */
+    InsertBuilder insertInto(String table);
+
+    /**
+     * Create a new UPDATE query builder.
+     *
+     * @param table The table to update
+     * @return A new UpdateBuilder instance
+     */
+    UpdateBuilder update(String table);
+
+    /**
+     * Create a new query builder for custom queries.
+     *
+     * @return A new QueryBuilder instance
+     */
+    QueryBuilder createQuery();
+
+    /**
+     * Execute a transaction with the provided transaction function.
+     *
+     * @param transactionFunction The function to execute within the transaction
+     * @param <T> The type of result returned by the transaction
+     * @return The result of the transaction
+     * @throws SQLException If an error occurs during the transaction
+     */
+    <T> T executeTransaction(Transaction<T> transactionFunction) throws SQLException;
+
+    /**
+     * Execute a transaction asynchronously.
+     *
+     * @param transactionFunction The function to execute within the transaction
+     * @param <T> The type of result returned by the transaction
+     * @return A CompletableFuture containing the result of the transaction
+     */
+    <T> CompletableFuture<T> executeTransactionAsync(Transaction<T> transactionFunction);
+
+    /**
+     * Execute a raw query and process the results with a consumer.
+     *
+     * @param sql The SQL query to execute
+     * @param resultConsumer The consumer to process each result row
+     * @param params The query parameters
+     * @throws SQLException If an error occurs during execution
+     */
+    void executeQuery(String sql, Consumer<ResultRow> resultConsumer, Object... params) throws SQLException;
+
+    /**
+     * Get a raw JDBC connection from the connection pool.
+     * Warning: The connection must be closed by the caller.
+     *
+     * @return A JDBC Connection object
+     * @throws SQLException If an error occurs obtaining the connection
      */
     Connection getConnection() throws SQLException;
-    
+
     /**
-     * Check if the database connection is valid
-     * 
+     * Check if the database connection is valid.
+     *
      * @return true if the connection is valid, false otherwise
      */
     boolean isConnectionValid();
-    
-    /**
-     * Get the query builder for this database
-     * 
-     * @return A query builder for creating SQL queries
-     */
-    QueryBuilder createQueryBuilder();
-    
-    /**
-     * Get the database type
-     * 
-     * @return The database type
-     */
-
-    DatabaseType getType();
 
     /**
-     * Execute a batch update with the provided statement and batch of parameters
-     * 
-     * @param sql The SQL query to execute
-     * @param batchParams List of parameter arrays for each batch operation
-     * @return Array of update counts for each batch operation
+     * Get database statistics and monitoring information.
+     *
+     * @return A map of statistics names to values
      */
-    int[] batchUpdate(String sql, List<Object[]> batchParams);
+    Map<String, Object> getStatistics();
 }

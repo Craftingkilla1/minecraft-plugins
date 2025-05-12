@@ -1,29 +1,90 @@
+// ./Sql-Bridge/build.gradle
+plugins {
+    id 'java'
+    id 'com.github.johnrengelman.shadow' version '7.1.2'
+    id 'maven-publish'
+}
+
 description = 'Database connectivity for modular plugin architecture'
 
-// Set project-specific version is handled by the VersioningPlugin
+group = 'com.minecraft'
+version = '1.0.0'
+
+repositories {
+    mavenCentral()
+    // Spigot repository
+    maven { url = 'https://hub.spigotmc.org/nexus/content/repositories/snapshots/' }
+    // BungeeCord repository
+    maven { url = 'https://oss.sonatype.org/content/groups/public/' }
+}
 
 dependencies {
-    // For development, use project dependency
+    // Bukkit/Spigot API
+    compileOnly 'org.spigotmc:spigot-api:1.16.5-R0.1-SNAPSHOT'
+    
+    // BungeeCord API for multi-server support
+    compileOnly 'net.md-5:bungeecord-api:1.16-R0.5-SNAPSHOT'
+    
+    // Core-Utils dependency
     compileOnly project(':Core-Utils')
     
-    // Database drivers - MySQL/MariaDB
-    implementation "mysql:mysql-connector-java:${rootProject.ext.mysqlVersion}"
+    // HikariCP for connection pooling
+    implementation 'com.zaxxer:HikariCP:3.4.5'
     
-    // Optional database drivers
-    implementation "org.postgresql:postgresql:${rootProject.ext.postgresqlVersion}"
-    implementation "com.h2database:h2:${rootProject.ext.h2Version}"
+    // MySQL Connector
+    implementation 'mysql:mysql-connector-java:8.0.33'
+    
+    // Lombok for reducing boilerplate
+    compileOnly 'org.projectlombok:lombok:1.18.30'
+    annotationProcessor 'org.projectlombok:lombok:1.18.30'
+    
+    // Testing dependencies
+    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.10.0'
+    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.10.0'
+    testImplementation 'org.mockito:mockito-core:5.5.0'
 }
 
 shadowJar {
-    archiveBaseName.set('SqlBridge')
+    // Configure which dependencies to include in the fat JAR
+    dependencies {
+        include(dependency('com.zaxxer:HikariCP'))
+        include(dependency('mysql:mysql-connector-java'))
+    }
     
-    // Relocate dependencies to avoid conflicts
-    relocate 'com.mysql', 'com.minecraft.sqlbridge.lib.mysql'
-    relocate 'org.postgresql', 'com.minecraft.sqlbridge.lib.postgresql'
-    relocate 'org.h2', 'com.minecraft.sqlbridge.lib.h2'
+    // Relocate packages to avoid conflicts
+    relocate 'com.zaxxer.hikari', 'com.minecraft.sqlbridge.libs.hikari'
+    relocate 'com.mysql', 'com.minecraft.sqlbridge.libs.mysql'
     
-    // Include license files
-    from('LICENSE') {
-        into '/'
+    // Set the output file name
+    archiveFileName = "Sql-Bridge-${version}.jar"
+}
+
+test {
+    useJUnitPlatform()
+}
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_1_8
+    targetCompatibility = JavaVersion.VERSION_1_8
+}
+
+// Make compileJava depend on Core-Utils shadow jar
+tasks.named('compileJava') {
+    dependsOn(':Core-Utils:shadowJar')
+}
+
+// Build task should depend on shadowJar
+tasks.named('build') {
+    dependsOn shadowJar
+}
+
+// Optional: Add specific publication configuration
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            // Set correct artifact coordinates
+            groupId = 'com.minecraft'
+            artifactId = 'sql-bridge'
+        }
     }
 }
