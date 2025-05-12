@@ -36,6 +36,9 @@ public class SqlBridgePlugin extends JavaPlugin {
     
     @Override
     public void onEnable() {
+        // Save default config
+        saveDefaultConfig();
+        
         // Initialize plugin components
         initializePlugin();
         
@@ -81,14 +84,14 @@ public class SqlBridgePlugin extends JavaPlugin {
         LogUtil.init(this);
         
         // Load configuration
-        saveDefaultConfig();
         sqlBridgeConfig = new SqlBridgeConfig(this);
         
         // Initialize error handler
         errorHandler = new ErrorHandler(this);
         
         try {
-            // Initialize database connection manager
+            // Initialize database connection manager based on the configuration type
+            String dbType = sqlBridgeConfig.getDatabaseType().toLowerCase();
             connectionManager = new ConnectionManager(this, sqlBridgeConfig);
             
             // Initialize migration manager

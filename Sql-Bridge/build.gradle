@@ -8,7 +8,7 @@ plugins {
 description = 'Database connectivity for modular plugin architecture'
 
 group = 'com.minecraft'
-version = '1.0.0'
+version = '1.0.4'
 
 repositories {
     mavenCentral()
@@ -34,6 +34,11 @@ dependencies {
     // MySQL Connector
     implementation 'mysql:mysql-connector-java:8.0.33'
     
+    // SLF4J API (required by HikariCP)
+    implementation 'org.slf4j:slf4j-api:1.7.25'
+    // Simple SLF4J implementation (to avoid warnings)
+    implementation 'org.slf4j:slf4j-simple:1.7.25'
+    
     // Lombok for reducing boilerplate
     compileOnly 'org.projectlombok:lombok:1.18.30'
     annotationProcessor 'org.projectlombok:lombok:1.18.30'
@@ -45,27 +50,19 @@ dependencies {
 }
 
 shadowJar {
-    // Configure which dependencies to include in the fat JAR
-    dependencies {
-        include(dependency('com.zaxxer:HikariCP'))
-        include(dependency('mysql:mysql-connector-java'))
-    }
+    // Include all runtime dependencies
+    configurations = [project.configurations.runtimeClasspath]
     
     // Relocate packages to avoid conflicts
     relocate 'com.zaxxer.hikari', 'com.minecraft.sqlbridge.libs.hikari'
     relocate 'com.mysql', 'com.minecraft.sqlbridge.libs.mysql'
+    relocate 'org.slf4j', 'com.minecraft.sqlbridge.libs.slf4j'
     
     // Set the output file name
     archiveFileName = "Sql-Bridge-${version}.jar"
-}
-
-test {
-    useJUnitPlatform()
-}
-
-java {
-    sourceCompatibility = JavaVersion.VERSION_1_8
-    targetCompatibility = JavaVersion.VERSION_1_8
+    
+    // Merge service files properly (needed for JDBC driver registration)
+    mergeServiceFiles()
 }
 
 // Make compileJava depend on Core-Utils shadow jar
@@ -78,6 +75,20 @@ tasks.named('build') {
     dependsOn shadowJar
 }
 
+// Always use shadowJar as the default jar
+artifacts {
+    archives shadowJar
+}
+
+test {
+    useJUnitPlatform()
+}
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_1_8
+    targetCompatibility = JavaVersion.VERSION_1_8
+}
+
 // Optional: Add specific publication configuration
 publishing {
     publications {
@@ -85,6 +96,9 @@ publishing {
             // Set correct artifact coordinates
             groupId = 'com.minecraft'
             artifactId = 'sql-bridge'
+            
+            // Use shadow jar as the published artifact
+            artifact shadowJar
         }
     }
 }

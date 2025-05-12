@@ -1,3 +1,4 @@
+// ./Example-Plugin/src/main/java/com/example/exampleplugin/ExampleCommand.java
 package com.example.exampleplugin;
 
 import com.minecraft.core.command.TabCompletionProvider;

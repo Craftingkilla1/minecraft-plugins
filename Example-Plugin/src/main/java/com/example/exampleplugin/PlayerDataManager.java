@@ -10,6 +10,7 @@ import org.bukkit.entity.Player;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -144,6 +145,14 @@ public class PlayerDataManager {
      */
     public boolean savePlayerData(PlayerData playerData) {
         try {
+            // Create parameters map manually instead of using Map.of since we're on Java 8
+            Map<String, Object> updateParams = new HashMap<>();
+            updateParams.put("blocks_broken", playerData.getBlocksBroken());
+            updateParams.put("blocks_placed", playerData.getBlocksPlaced());
+            updateParams.put("mobs_killed", playerData.getMobsKilled());
+            updateParams.put("deaths", playerData.getDeaths());
+            updateParams.put("last_seen", playerData.getLastSeen());
+            
             // Use fluent query builder
             int rowsAffected = database.insertInto("player_data")
                 .columns("uuid", "name", "blocks_broken", "blocks_placed", 
@@ -158,15 +167,7 @@ public class PlayerDataManager {
                     playerData.getLastSeen(),
                     playerData.getFirstJoin()
                 )
-                .onDuplicateKeyUpdate(
-                    Map.of(
-                        "blocks_broken", playerData.getBlocksBroken(),
-                        "blocks_placed", playerData.getBlocksPlaced(),
-                        "mobs_killed", playerData.getMobsKilled(),
-                        "deaths", playerData.getDeaths(),
-                        "last_seen", playerData.getLastSeen()
-                    )
-                )
+                .onDuplicateKeyUpdate(updateParams)
                 .executeUpdate();
             
             if (rowsAffected > 0) {
@@ -302,7 +303,7 @@ public class PlayerDataManager {
             return database.executeTransaction(connection -> {
                 try (PreparedStatement stmt = connection.prepareStatement(
                         "SELECT COUNT(*) FROM player_data")) {
-                    try (var rs = stmt.executeQuery()) {
+                    try (ResultSet rs = stmt.executeQuery()) {
                         if (rs.next()) {
                             return rs.getInt(1);
                         }

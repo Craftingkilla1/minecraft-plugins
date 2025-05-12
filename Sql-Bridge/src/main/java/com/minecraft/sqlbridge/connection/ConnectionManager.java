@@ -6,6 +6,7 @@ import com.minecraft.sqlbridge.SqlBridgePlugin;
 import com.minecraft.sqlbridge.config.SqlBridgeConfig;
 import com.minecraft.sqlbridge.dialect.Dialect;
 import com.minecraft.sqlbridge.dialect.MySQLDialect;
+import com.minecraft.sqlbridge.dialect.SQLiteDialect;
 import com.minecraft.sqlbridge.error.ConnectionException;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
@@ -72,16 +73,30 @@ public class ConnectionManager {
      */
     private void initializeMainConnection() {
         try {
-            mainDataSource = createMySQLDataSource("main", 
-                    config.getMySQLHost(), 
-                    config.getMySQLPort(), 
-                    config.getMySQLDatabase(), 
-                    config.getMySQLUsername(), 
-                    config.getMySQLPassword());
+            String dbType = config.getDatabaseType().toLowerCase();
             
-            dialects.put("main", new MySQLDialect());
+            if (dbType.equals("mysql")) {
+                mainDataSource = createMySQLDataSource("main", 
+                        config.getMySQLHost(), 
+                        config.getMySQLPort(), 
+                        config.getMySQLDatabase(), 
+                        config.getMySQLUsername(), 
+                        config.getMySQLPassword());
+                
+                dialects.put("main", new MySQLDialect());
+                LogUtil.info("Main connection initialized successfully using MySQL");
+            } else if (dbType.equals("sqlite")) {
+                mainDataSource = createSQLiteDataSource("main", 
+                        config.getSQLiteFile(),
+                        config.isSQLiteWalMode());
+                
+                dialects.put("main", new SQLiteDialect());
+                LogUtil.info("Main connection initialized successfully using SQLite");
+            } else {
+                throw new ConnectionException("Unsupported database type: " + dbType);
+            }
+            
             dataSources.put("main", mainDataSource);
-            LogUtil.info("Main connection initialized successfully using MySQL");
             
             // Test connection
             testConnection(mainDataSource);
@@ -97,17 +112,38 @@ public class ConnectionManager {
      */
     private void initializeSharedConnection() {
         try {
-            // For shared databases, we always use MySQL
-            sharedDataSource = createMySQLDataSource("shared", 
-                    config.getMySQLHost(), 
-                    config.getMySQLPort(), 
-                    config.getMySQLDatabase() + "_shared", 
-                    config.getMySQLUsername(), 
-                    config.getMySQLPassword());
+            String dbType = config.getDatabaseType().toLowerCase();
             
-            dialects.put("shared", new MySQLDialect());
+            if (dbType.equals("mysql")) {
+                // For MySQL, we create a separate database with _shared suffix
+                sharedDataSource = createMySQLDataSource("shared", 
+                        config.getMySQLHost(), 
+                        config.getMySQLPort(), 
+                        config.getMySQLDatabase() + "_shared", 
+                        config.getMySQLUsername(), 
+                        config.getMySQLPassword());
+                
+                dialects.put("shared", new MySQLDialect());
+                LogUtil.info("Shared connection initialized successfully using MySQL");
+            } else if (dbType.equals("sqlite")) {
+                // For SQLite, we use a different file with _shared suffix
+                String sharedFile = config.getSQLiteFile().replace(".db", "_shared.db");
+                if (sharedFile.equals(config.getSQLiteFile())) {
+                    // If no .db extension, just append _shared
+                    sharedFile = config.getSQLiteFile() + "_shared";
+                }
+                
+                sharedDataSource = createSQLiteDataSource("shared", 
+                        sharedFile,
+                        config.isSQLiteWalMode());
+                
+                dialects.put("shared", new SQLiteDialect());
+                LogUtil.info("Shared connection initialized successfully using SQLite");
+            } else {
+                throw new ConnectionException("Unsupported database type for shared connection: " + dbType);
+            }
+            
             dataSources.put("shared", sharedDataSource);
-            LogUtil.info("Shared connection initialized successfully using MySQL");
             
             // Test connection
             testConnection(sharedDataSource);
@@ -163,6 +199,47 @@ public class ConnectionManager {
         if (config.isMySQLAutoCreateDatabase()) {
             createMySQLDatabaseIfNotExists(host, port, database, username, password);
         }
+        
+        return new HikariDataSource(hikariConfig);
+    }
+
+    /**
+     * Create a SQLite data source with HikariCP.
+     *
+     * @param name The name of the data source
+     * @param file The SQLite database file
+     * @param walMode Whether to use WAL mode
+     * @return The HikariDataSource
+     */
+    private HikariDataSource createSQLiteDataSource(String name, String file, boolean walMode) {
+        HikariConfig hikariConfig = new HikariConfig();
+        
+        hikariConfig.setPoolName("SqlBridge-" + name);
+        hikariConfig.setDriverClassName("org.sqlite.JDBC");
+        
+        // Construct the full path to the database file
+        String dbPath = plugin.getDataFolder().getAbsolutePath() + "/" + file;
+        String jdbcUrl = "jdbc:sqlite:" + dbPath;
+        
+        // Add WAL mode if enabled
+        if (walMode) {
+            jdbcUrl += "?journal_mode=WAL";
+        }
+        
+        hikariConfig.setJdbcUrl(jdbcUrl);
+        
+        // Connection pool settings - SQLite has some limitations
+        hikariConfig.setMaximumPoolSize(5); // SQLite doesn't handle many concurrent connections well
+        hikariConfig.setMinimumIdle(1);
+        hikariConfig.setMaxLifetime(1800000);
+        hikariConfig.setConnectionTimeout(30000);
+        hikariConfig.setIdleTimeout(600000);
+        
+        // SQLite-specific properties
+        hikariConfig.addDataSourceProperty("foreign_keys", "true");
+        hikariConfig.addDataSourceProperty("synchronous", "normal");
+        
+        LogUtil.info("Created SQLite data source: " + dbPath);
         
         return new HikariDataSource(hikariConfig);
     }
@@ -241,15 +318,36 @@ public class ConnectionManager {
             
             LogUtil.info("Creating new connection: " + name);
             
-            HikariDataSource dataSource = createMySQLDataSource(name, 
-                    config.getMySQLHost(), 
-                    config.getMySQLPort(), 
-                    config.getMySQLDatabase() + "_" + name.toLowerCase(), 
-                    config.getMySQLUsername(), 
-                    config.getMySQLPassword());
+            String dbType = config.getDatabaseType().toLowerCase();
+            HikariDataSource dataSource;
+            
+            if (dbType.equals("mysql")) {
+                dataSource = createMySQLDataSource(name, 
+                        config.getMySQLHost(), 
+                        config.getMySQLPort(), 
+                        config.getMySQLDatabase() + "_" + name.toLowerCase(), 
+                        config.getMySQLUsername(), 
+                        config.getMySQLPassword());
+                
+                dialects.put(name, new MySQLDialect());
+            } else if (dbType.equals("sqlite")) {
+                // For SQLite, create a separate file for each named connection
+                String fileName = config.getSQLiteFile().replace(".db", "_" + name.toLowerCase() + ".db");
+                if (fileName.equals(config.getSQLiteFile())) {
+                    // If no .db extension, just append _name
+                    fileName = config.getSQLiteFile() + "_" + name.toLowerCase();
+                }
+                
+                dataSource = createSQLiteDataSource(name, 
+                        fileName, 
+                        config.isSQLiteWalMode());
+                
+                dialects.put(name, new SQLiteDialect());
+            } else {
+                throw new ConnectionException("Unsupported database type: " + dbType);
+            }
             
             dataSources.put(name, dataSource);
-            dialects.put(name, new MySQLDialect());
             return dataSource;
         }
     }

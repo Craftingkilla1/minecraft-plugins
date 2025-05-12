@@ -1,6 +1,6 @@
 # ./Sql-Bridge/src/main/resources/plugin.yml
 name: SqlBridge
-version: '1.0.0'
+version: '1.0.4'
 main: com.minecraft.sqlbridge.SqlBridgePlugin
 api-version: '1.16'
 depend: [CoreUtils]

@@ -38,6 +38,10 @@ public class SqlBridgeConfig {
     private long mySQLKeepaliveTime;
     private long mySQLLeakDetectionThreshold;
     
+    // SQLite configuration
+    private String sqliteFile;
+    private boolean sqliteWalMode;
+    
     // BungeeSupport configuration
     private boolean bungeeEnabled;
     private boolean sharedDatabaseEnabled;
@@ -84,8 +88,8 @@ public class SqlBridgeConfig {
         // Debug mode
         debugMode = config.getBoolean("debug", false);
         
-        // Database configuration - now defaulting to MySQL
-        databaseType = "mysql";
+        // Database configuration
+        databaseType = config.getString("database.type", "mysql").toLowerCase();
         
         // MySQL configuration
         mySQLHost = config.getString("database.mysql.host", "localhost");
@@ -114,6 +118,17 @@ public class SqlBridgeConfig {
             mySQLIdleTimeout = 600000;
             mySQLKeepaliveTime = 30000;
             mySQLLeakDetectionThreshold = 30000;
+        }
+        
+        // SQLite configuration
+        ConfigurationSection sqliteSection = config.getConfigurationSection("database.sqlite");
+        if (sqliteSection != null) {
+            sqliteFile = sqliteSection.getString("file", "database.db");
+            sqliteWalMode = sqliteSection.getBoolean("wal-mode", true);
+        } else {
+            // Default values
+            sqliteFile = "database.db";
+            sqliteWalMode = true;
         }
         
         // BungeeSupport configuration
@@ -200,10 +215,15 @@ public class SqlBridgeConfig {
         LogUtil.info("SQL-Bridge configuration loaded:");
         LogUtil.info("  Database Type: " + databaseType);
         
-        LogUtil.info("  MySQL Host: " + mySQLHost + ":" + mySQLPort);
-        LogUtil.info("  MySQL Database: " + mySQLDatabase);
-        LogUtil.info("  MySQL Auto-Create Database: " + mySQLAutoCreateDatabase);
-        LogUtil.info("  MySQL Connection Pool Size: " + mySQLMaxPoolSize);
+        if (databaseType.equals("mysql")) {
+            LogUtil.info("  MySQL Host: " + mySQLHost + ":" + mySQLPort);
+            LogUtil.info("  MySQL Database: " + mySQLDatabase);
+            LogUtil.info("  MySQL Auto-Create Database: " + mySQLAutoCreateDatabase);
+            LogUtil.info("  MySQL Connection Pool Size: " + mySQLMaxPoolSize);
+        } else if (databaseType.equals("sqlite")) {
+            LogUtil.info("  SQLite File: " + sqliteFile);
+            LogUtil.info("  SQLite WAL Mode: " + sqliteWalMode);
+        }
         
         LogUtil.info("  BungeeSupport Enabled: " + bungeeEnabled);
         if (bungeeEnabled) {
@@ -347,6 +367,24 @@ public class SqlBridgeConfig {
      */
     public long getMySQLLeakDetectionThreshold() {
         return mySQLLeakDetectionThreshold;
+    }
+    
+    /**
+     * Get the SQLite database file.
+     *
+     * @return The SQLite database file
+     */
+    public String getSQLiteFile() {
+        return sqliteFile;
+    }
+    
+    /**
+     * Get whether SQLite WAL mode is enabled.
+     *
+     * @return true if WAL mode is enabled, false otherwise
+     */
+    public boolean isSQLiteWalMode() {
+        return sqliteWalMode;
     }
     
     /**

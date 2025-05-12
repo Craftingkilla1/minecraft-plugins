@@ -6,6 +6,9 @@ debug: false
 
 # Database configuration
 database:
+  # Database type: MYSQL, POSTGRESQL, SQLITE, H2
+  type: sqlite
+  
   # MySQL configuration
   mysql:
     host: localhost
@@ -16,23 +19,26 @@ database:
     # Whether to create the database if it doesn't exist
     auto-create-database: true
     
-    # Connection pool settings (HikariCP)
+    # Connection pool settings
     pool:
-      # Maximum size of the connection pool
+      # Maximum number of connections in the pool
       maximum-pool-size: 10
-      # Minimum number of idle connections
+      # Minimum idle connections
       minimum-idle: 5
       # Maximum lifetime of a connection in milliseconds
       maximum-lifetime: 1800000
       # Connection timeout in milliseconds
-      connection-timeout: 30000
-      # How often to check idle connections for validity
-      idle-timeout: 600000
-      # Keep alive time (in ms)
-      keepalive-time: 30000
-      # Whether to log connection leaks
-      leak-detection-threshold: 30000
-  
+      connection-timeout: 5000
+      # Allow the pool to self-heal connection failures
+      auto-reconnect: true
+
+  # SQLite configuration
+  sqlite:
+    # Database file (relative to plugin folder)
+    file: database.db
+    # Whether to use WAL mode for better performance
+    wal-mode: true
+
 # BungeeSupport configuration
 bungee:
   # Whether to enable BungeeSupport for multi-server setups
@@ -67,7 +73,7 @@ migrations:
   # Rollback failed migrations
   rollback-failed-migrations: true
 
-# Query batch settings
+# Batch settings
 batch:
   # Default batch size for batch operations
   default-size: 100
