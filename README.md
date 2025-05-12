@@ -68,10 +68,6 @@ Each plugin has its own configuration files and commands:
 /exampledb - Access database features
 ```
 
-### For Plugin Developers
-
-These plugins provide APIs that can be used in your own plugins. See the [Developer Documentation](DEVELOPMENT.md) for details.
-
 ## ⚙️ Configuration
 
 Each plugin has its own configuration files in the `plugins/PluginName` directory:
@@ -102,20 +98,11 @@ features:
   database_integration: true
 ```
 
-## 🔄 Building From Source
-
-See the [Developer Documentation](DEVELOPMENT.md) for information on building from source.
-
 ## 📄 License
 
 Each plugin is licensed under the MIT License - see individual plugin directories for details.
-
-## 🤝 Contributing
-
-Contributions are welcome! Please see [DEVELOPMENT.md](DEVELOPMENT.md) for development workflows and guidelines.
 
 ## 📚 Documentation
 
 - Check each plugin's dedicated documentation for detailed information
 - For version history and changes, see the [Releases](../../releases) page
-- For development info, refer to [DEVELOPMENT.md](DEVELOPMENT.md)

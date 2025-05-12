@@ -417,6 +417,121 @@ public class DefaultDatabase implements Database {
         
         // Implementation would go here
         // This is just a stub for now
+        
+        @Override
+        public SelectBuilder columns(String... columns) {
+            return this;
+        }
+        
+        @Override
+        public SelectBuilder from(String table) {
+            return this;
+        }
+        
+        @Override
+        public SelectBuilder where(String condition, Object... parameters) {
+            return this;
+        }
+        
+        @Override
+        public SelectBuilder and(String condition, Object... parameters) {
+            return this;
+        }
+        
+        @Override
+        public SelectBuilder or(String condition, Object... parameters) {
+            return this;
+        }
+        
+        @Override
+        public SelectBuilder join(String type, String table, String condition) {
+            return this;
+        }
+        
+        @Override
+        public SelectBuilder innerJoin(String table, String condition) {
+            return this;
+        }
+        
+        @Override
+        public SelectBuilder leftJoin(String table, String condition) {
+            return this;
+        }
+        
+        @Override
+        public SelectBuilder rightJoin(String table, String condition) {
+            return this;
+        }
+        
+        @Override
+        public SelectBuilder groupBy(String... columns) {
+            return this;
+        }
+        
+        @Override
+        public SelectBuilder having(String condition, Object... parameters) {
+            return this;
+        }
+        
+        @Override
+        public SelectBuilder orderBy(String orderBy) {
+            return this;
+        }
+        
+        @Override
+        public SelectBuilder limit(int limit) {
+            return this;
+        }
+        
+        @Override
+        public SelectBuilder offset(int offset) {
+            return this;
+        }
+        
+        @Override
+        public SelectBuilder forUpdate() {
+            return this;
+        }
+        
+        @Override
+        public String getSQL() {
+            return "";
+        }
+        
+        @Override
+        public Object[] getParameters() {
+            return new Object[0];
+        }
+        
+        @Override
+        public <T> List<T> executeQuery(ResultMapper<T> mapper) throws SQLException {
+            return new ArrayList<>();
+        }
+        
+        @Override
+        public <T> CompletableFuture<List<T>> executeQueryAsync(ResultMapper<T> mapper) {
+            return CompletableFuture.completedFuture(new ArrayList<>());
+        }
+        
+        @Override
+        public <T> Optional<T> executeQueryFirst(ResultMapper<T> mapper) throws SQLException {
+            return Optional.empty();
+        }
+        
+        @Override
+        public <T> CompletableFuture<Optional<T>> executeQueryFirstAsync(ResultMapper<T> mapper) {
+            return CompletableFuture.completedFuture(Optional.empty());
+        }
+        
+        @Override
+        public int executeUpdate() throws SQLException {
+            return 0;
+        }
+        
+        @Override
+        public CompletableFuture<Integer> executeUpdateAsync() {
+            return CompletableFuture.completedFuture(0);
+        }
     }
 
     /**
@@ -434,6 +549,86 @@ public class DefaultDatabase implements Database {
         
         // Implementation would go here
         // This is just a stub for now
+        
+        @Override
+        public InsertBuilder columns(String... columns) {
+            return this;
+        }
+        
+        @Override
+        public InsertBuilder values(Object... values) {
+            return this;
+        }
+        
+        @Override
+        public InsertBuilder addRow(Object... values) {
+            return this;
+        }
+        
+        @Override
+        public InsertBuilder columnValues(Map<String, Object> columnValues) {
+            return this;
+        }
+        
+        @Override
+        public InsertBuilder onDuplicateKeyUpdate(String column, Object value) {
+            return this;
+        }
+        
+        @Override
+        public InsertBuilder onDuplicateKeyUpdate(Map<String, Object> columnValues) {
+            return this;
+        }
+        
+        @Override
+        public InsertBuilder select(SelectBuilder selectBuilder) {
+            return this;
+        }
+        
+        @Override
+        public InsertBuilder returning(String... columns) {
+            return this;
+        }
+        
+        @Override
+        public String getSQL() {
+            return "";
+        }
+        
+        @Override
+        public Object[] getParameters() {
+            return new Object[0];
+        }
+        
+        @Override
+        public <T> List<T> executeQuery(ResultMapper<T> mapper) throws SQLException {
+            return new ArrayList<>();
+        }
+        
+        @Override
+        public <T> CompletableFuture<List<T>> executeQueryAsync(ResultMapper<T> mapper) {
+            return CompletableFuture.completedFuture(new ArrayList<>());
+        }
+        
+        @Override
+        public <T> Optional<T> executeQueryFirst(ResultMapper<T> mapper) throws SQLException {
+            return Optional.empty();
+        }
+        
+        @Override
+        public <T> CompletableFuture<Optional<T>> executeQueryFirstAsync(ResultMapper<T> mapper) {
+            return CompletableFuture.completedFuture(Optional.empty());
+        }
+        
+        @Override
+        public int executeUpdate() throws SQLException {
+            return 0;
+        }
+        
+        @Override
+        public CompletableFuture<Integer> executeUpdateAsync() {
+            return CompletableFuture.completedFuture(0);
+        }
     }
 
     /**
@@ -451,6 +646,86 @@ public class DefaultDatabase implements Database {
         
         // Implementation would go here
         // This is just a stub for now
+        
+        @Override
+        public UpdateBuilder set(String column, Object value) {
+            return this;
+        }
+        
+        @Override
+        public UpdateBuilder set(Map<String, Object> columnValues) {
+            return this;
+        }
+        
+        @Override
+        public UpdateBuilder where(String condition, Object... parameters) {
+            return this;
+        }
+        
+        @Override
+        public UpdateBuilder and(String condition, Object... parameters) {
+            return this;
+        }
+        
+        @Override
+        public UpdateBuilder or(String condition, Object... parameters) {
+            return this;
+        }
+        
+        @Override
+        public UpdateBuilder limit(int limit) {
+            return this;
+        }
+        
+        @Override
+        public UpdateBuilder orderBy(String orderBy) {
+            return this;
+        }
+        
+        @Override
+        public UpdateBuilder returning(String... columns) {
+            return this;
+        }
+        
+        @Override
+        public String getSQL() {
+            return "";
+        }
+        
+        @Override
+        public Object[] getParameters() {
+            return new Object[0];
+        }
+        
+        @Override
+        public <T> List<T> executeQuery(ResultMapper<T> mapper) throws SQLException {
+            return new ArrayList<>();
+        }
+        
+        @Override
+        public <T> CompletableFuture<List<T>> executeQueryAsync(ResultMapper<T> mapper) {
+            return CompletableFuture.completedFuture(new ArrayList<>());
+        }
+        
+        @Override
+        public <T> Optional<T> executeQueryFirst(ResultMapper<T> mapper) throws SQLException {
+            return Optional.empty();
+        }
+        
+        @Override
+        public <T> CompletableFuture<Optional<T>> executeQueryFirstAsync(ResultMapper<T> mapper) {
+            return CompletableFuture.completedFuture(Optional.empty());
+        }
+        
+        @Override
+        public int executeUpdate() throws SQLException {
+            return 0;
+        }
+        
+        @Override
+        public CompletableFuture<Integer> executeUpdateAsync() {
+            return CompletableFuture.completedFuture(0);
+        }
     }
 
     /**
@@ -466,5 +741,45 @@ public class DefaultDatabase implements Database {
         
         // Implementation would go here
         // This is just a stub for now
+        
+        @Override
+        public String getSQL() {
+            return "";
+        }
+        
+        @Override
+        public Object[] getParameters() {
+            return new Object[0];
+        }
+        
+        @Override
+        public <T> List<T> executeQuery(ResultMapper<T> mapper) throws SQLException {
+            return new ArrayList<>();
+        }
+        
+        @Override
+        public <T> CompletableFuture<List<T>> executeQueryAsync(ResultMapper<T> mapper) {
+            return CompletableFuture.completedFuture(new ArrayList<>());
+        }
+        
+        @Override
+        public <T> Optional<T> executeQueryFirst(ResultMapper<T> mapper) throws SQLException {
+            return Optional.empty();
+        }
+        
+        @Override
+        public <T> CompletableFuture<Optional<T>> executeQueryFirstAsync(ResultMapper<T> mapper) {
+            return CompletableFuture.completedFuture(Optional.empty());
+        }
+        
+        @Override
+        public int executeUpdate() throws SQLException {
+            return 0;
+        }
+        
+        @Override
+        public CompletableFuture<Integer> executeUpdateAsync() {
+            return CompletableFuture.completedFuture(0);
+        }
     }
 }

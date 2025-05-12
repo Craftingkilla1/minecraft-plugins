@@ -145,7 +145,6 @@ public class ConnectionManager {
         hikariConfig.setMaxLifetime(config.getMySQLMaxLifetime());
         hikariConfig.setConnectionTimeout(config.getMySQLConnectionTimeout());
         hikariConfig.setIdleTimeout(config.getMySQLIdleTimeout());
-        hikariConfig.setKeepaliveTime(config.getMySQLKeepaliveTime());
         hikariConfig.setLeakDetectionThreshold(config.getMySQLLeakDetectionThreshold());
         
         // Additional properties
