@@ -14,11 +14,14 @@ A high-performance database connectivity plugin for Minecraft servers, providing
 - **Extensible API**: Easy integration with other plugins
 - **Monitoring Dashboards**: Track database performance with built-in metrics
 - **Scalable Architecture**: Designed for high-traffic Minecraft servers
+- **Migration System**: Manage database schema versions and migrations
+- **BungeeCord Support**: Share database connections across a network of servers
 
 ## Requirements
 
 - Java 8 or higher
 - Bukkit/Spigot/Paper server 1.12.2 or higher
+- CoreUtils plugin
 - Database server (MySQL, PostgreSQL) or file-based database (SQLite, H2)
 
 ## Installation
@@ -34,112 +37,280 @@ A high-performance database connectivity plugin for Minecraft servers, providing
 The plugin creates a default configuration file at `plugins/SQL-Bridge/config.yml`. Here's a sample configuration:
 
 ```yaml
+# Debug mode - enables additional logging
+debug: false
+
 # Database configuration
 database:
   # Database type: MYSQL, POSTGRESQL, SQLITE, H2
-  type: MYSQL
-  # Database connection settings
-  host: localhost
-  port: 3306
-  database: minecraft
-  username: username
-  password: password
-  # Connection pool settings
-  pool:
-    # Maximum number of connections in the pool
-    max-connections: 10
-    # Minimum idle connections
-    min-idle: 5
-    # Maximum lifetime of a connection in milliseconds
-    max-lifetime: 1800000
-    # Connection timeout in milliseconds
-    connection-timeout: 5000
-    # Allow the pool to self-heal connection failures
-    auto-reconnect: true
+  type: sqlite
+  
+  # MySQL configuration
+  mysql:
+    host: localhost
+    port: 3306
+    database: minecraft
+    username: root
+    password: password
+    # Whether to create the database if it doesn't exist
+    auto-create-database: true
+    
+    # Connection pool settings
+    pool:
+      # Maximum number of connections in the pool
+      maximum-pool-size: 10
+      # Minimum idle connections
+      minimum-idle: 5
+      # Maximum lifetime of a connection in milliseconds
+      maximum-lifetime: 1800000
+      # Connection timeout in milliseconds
+      connection-timeout: 5000
+      # Allow the pool to self-heal connection failures
+      auto-reconnect: true
 
-# Monitoring settings
+  # SQLite configuration
+  sqlite:
+    # Database file (relative to plugin folder)
+    file: database.db
+    # Whether to use WAL mode for better performance
+    wal-mode: true
+
+# Performance monitoring
 monitoring:
-  # Enable performance monitoring
+  # Enable monitoring
   enabled: true
-  # Log performance metrics
-  log-performance: true
-  # Log database metrics
-  log-db-metrics: true
-  # Metrics history size
-  history-size: 60
-  # Sampling interval in seconds
-  sampling-interval: 60
-  # Slow query threshold in milliseconds
+  # Log slow queries that take longer than this many milliseconds
   slow-query-threshold: 1000
-  # Database metrics collection interval in seconds
-  db-metrics-interval: 300
-
-# Logging settings
-logging:
-  # Log level: DEBUG, INFO, WARNING, ERROR
-  level: INFO
-  # Enable logging of SQL queries
-  log-queries: false
-  # Log slow queries
-  log-slow-queries: true
 ```
 
-## Usage
+## Developer Guide
 
-### Basic Usage
+### Getting Started
+
+SQL-Bridge uses a service-based architecture to provide database connectivity to your plugin. Here's how to integrate it with your plugin:
+
+1. Add SQL-Bridge as a dependency in your `plugin.yml`:
+
+```yaml
+depend: [SQL-Bridge, CoreUtils]
+```
+
+2. Access the database service in your plugin:
 
 ```java
-// Get the plugin instance
-SqlBridgePlugin plugin = (SqlBridgePlugin) Bukkit.getPluginManager().getPlugin("SQL-Bridge");
+import com.minecraft.sqlbridge.api.DatabaseService;
+import com.minecraft.sqlbridge.api.Database;
+import com.minecraft.core.api.service.ServiceRegistry;
 
-// Get the database
-Database database = plugin.getDatabase();
-
-// Execute a query
-List<Map<String, Object>> results = database.query(
-    "SELECT * FROM players WHERE level > ?",
-    row -> row,
-    10
-);
-
-// Process results
-for (Map<String, Object> row : results) {
-    String playerName = (String) row.get("name");
-    int playerLevel = ((Number) row.get("level")).intValue();
-    // Do something with the data
+public class YourPlugin extends JavaPlugin {
+    private DatabaseService databaseService;
+    private Database database;
+    
+    @Override
+    public void onEnable() {
+        // Get the DatabaseService from the ServiceRegistry
+        databaseService = ServiceRegistry.getService(DatabaseService.class);
+        if (databaseService == null) {
+            getLogger().severe("Failed to get DatabaseService - is SQL-Bridge enabled?");
+            getServer().getPluginManager().disablePlugin(this);
+            return;
+        }
+        
+        // Get a database connection specific to your plugin
+        database = databaseService.getDatabaseForPlugin(getName());
+        
+        // Initialize your database schema
+        initDatabase();
+    }
+    
+    private void initDatabase() {
+        try {
+            // Create tables, etc.
+            database.update("CREATE TABLE IF NOT EXISTS my_table (" +
+                           "id INT AUTO_INCREMENT PRIMARY KEY, " +
+                           "name VARCHAR(100) NOT NULL, " +
+                           "value INT NOT NULL)");
+            
+            getLogger().info("Database initialized successfully!");
+        } catch (SQLException e) {
+            getLogger().severe("Failed to initialize database: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
 }
 ```
 
-### Query Builder
+### Basic Database Operations
+
+#### Executing Queries
 
 ```java
-// Get the query builder
-QueryBuilder builder = database.createQueryBuilder();
-
-// Build a SELECT query
-String sql = builder
-    .select("p.name", "p.level", "g.name AS guild_name")
-    .from("players p")
-    .join("guilds g", "p.guild_id = g.id")
-    .where("p.level", ">", 20)
-    .orderBy("p.level", "DESC")
-    .limit(10)
-    .build();
-
-// Execute the query
-List<Map<String, Object>> results = database.query(
-    sql,
-    row -> row,
-    builder.getParameters()
+// Simple query with ResultMapper to map results to objects
+List<Player> players = database.query(
+    "SELECT * FROM players WHERE level > ?",
+    row -> {
+        // Map each row to a Player object
+        Player player = new Player();
+        player.setId(row.getInt("id"));
+        player.setName(row.getString("name"));
+        player.setLevel(row.getInt("level"));
+        return player;
+    },
+    10 // Parameter value for the ? placeholder
 );
+
+// Get a single result
+Optional<Player> playerOpt = database.queryFirst(
+    "SELECT * FROM players WHERE name = ?",
+    row -> {
+        Player player = new Player();
+        player.setId(row.getInt("id"));
+        player.setName(row.getString("name"));
+        player.setLevel(row.getInt("level"));
+        return player;
+    },
+    "PlayerName"
+);
+
+// Process results with a consumer
+database.executeQuery(
+    "SELECT * FROM players", 
+    row -> {
+        // Process each row
+        String name = row.getString("name");
+        int level = row.getInt("level");
+        System.out.println(name + " is level " + level);
+    }
+);
+```
+
+#### Executing Updates
+
+```java
+// Insert a new player
+int rowsAffected = database.update(
+    "INSERT INTO players (name, level) VALUES (?, ?)",
+    "NewPlayer", 1
+);
+
+// Update player level
+database.update(
+    "UPDATE players SET level = ? WHERE name = ?",
+    5, "PlayerName"
+);
+
+// Delete a player
+database.update(
+    "DELETE FROM players WHERE name = ?",
+    "PlayerName"
+);
+```
+
+#### Asynchronous Operations
+
+```java
+// Async query
+database.queryAsync(
+    "SELECT * FROM players WHERE level > ?",
+    row -> {
+        Player player = new Player();
+        player.setId(row.getInt("id"));
+        player.setName(row.getString("name"));
+        player.setLevel(row.getInt("level"));
+        return player;
+    },
+    10
+).thenAccept(players -> {
+    // This will run when the query completes
+    System.out.println("Found " + players.size() + " players");
+}).exceptionally(ex -> {
+    // Handle exceptions
+    ex.printStackTrace();
+    return null;
+});
+
+// Async update
+database.updateAsync(
+    "UPDATE players SET level = level + 1 WHERE name = ?",
+    "PlayerName"
+).thenAccept(rowsAffected -> {
+    System.out.println("Updated " + rowsAffected + " rows");
+}).exceptionally(ex -> {
+    ex.printStackTrace();
+    return null;
+});
+```
+
+### Using Query Builders
+
+SQL-Bridge provides a fluent API for building SQL queries:
+
+#### Select Builder
+
+```java
+List<Player> players = database.select()
+    .columns("id", "name", "level")
+    .from("players")
+    .where("level > ?", 10)
+    .orderBy("level DESC")
+    .limit(10)
+    .executeQuery(row -> {
+        Player player = new Player();
+        player.setId(row.getInt("id"));
+        player.setName(row.getString("name"));
+        player.setLevel(row.getInt("level"));
+        return player;
+    });
+```
+
+#### Insert Builder
+
+```java
+int rowsAffected = database.insertInto("players")
+    .columns("name", "level")
+    .values("NewPlayer", 1)
+    .executeUpdate();
+
+// Insert with on duplicate key update
+database.insertInto("players")
+    .columns("name", "level")
+    .values("ExistingPlayer", 5)
+    .onDuplicateKeyUpdate("level", 5)
+    .executeUpdate();
+
+// Insert multiple rows
+database.insertInto("players")
+    .columns("name", "level")
+    .values("Player1", 1)
+    .addRow("Player2", 2)
+    .addRow("Player3", 3)
+    .executeUpdate();
+```
+
+#### Update Builder
+
+```java
+int rowsAffected = database.update("players")
+    .set("level", 5)
+    .where("name = ?", "PlayerName")
+    .executeUpdate();
+
+// Update multiple columns
+Map<String, Object> updates = new HashMap<>();
+updates.put("level", 10);
+updates.put("experience", 500);
+
+database.update("players")
+    .set(updates)
+    .where("name = ?", "PlayerName")
+    .executeUpdate();
 ```
 
 ### Transactions
 
 ```java
-// Execute a transaction
-boolean success = database.transaction(connection -> {
-    // Execute multiple operations in a transaction
+// Execute operations in a transaction
+boolean success = database.executeTransaction(connection -> {
     try (PreparedStatement stmt1 = connection.prepareStatement(
             "INSERT INTO players (name, level) VALUES (?, ?)")) {
         stmt1.setString(1, "NewPlayer");
@@ -153,6 +324,17 @@ boolean success = database.transaction(connection -> {
     }
     
     return true; // Commit the transaction
+});
+
+// Async transaction
+database.executeTransactionAsync(connection -> {
+    // Your transaction code here
+    return true;
+}).thenAccept(result -> {
+    System.out.println("Transaction completed with result: " + result);
+}).exceptionally(ex -> {
+    ex.printStackTrace();
+    return null;
 });
 ```
 
@@ -170,31 +352,118 @@ int[] results = database.batchUpdate(
     "INSERT INTO players (name, level) VALUES (?, ?)",
     batchParams
 );
+
+// Async batch update
+database.batchUpdateAsync(
+    "INSERT INTO players (name, level) VALUES (?, ?)",
+    batchParams
+).thenAccept(results -> {
+    System.out.println("Batch update completed, inserted " + results.length + " rows");
+});
 ```
 
-## API Documentation
+### Database Migrations
 
-### Key Classes
+SQL-Bridge provides a migration system to manage database schema versions:
 
-- `SqlBridgePlugin`: Main plugin class
-- `Database`: Interface for database operations
-- `DatabaseImpl`: Implementation of the Database interface
-- `ConnectionManager`: Manages database connections
-- `QueryBuilder`: Builds SQL queries with a fluent API
-- `PerformanceMonitor`: Monitors database performance
-- `DatabaseMetricsCollector`: Collects database-specific metrics
+```java
+public class YourPlugin extends JavaPlugin {
+    private DatabaseService databaseService;
+    
+    @Override
+    public void onEnable() {
+        databaseService = ServiceRegistry.getService(DatabaseService.class);
+        
+        // Register migrations
+        List<Migration> migrations = new ArrayList<>();
+        migrations.add(new CreateInitialTables());
+        migrations.add(new AddColumnsMigration());
+        
+        databaseService.registerMigrations(getName(), migrations);
+        
+        // Run migrations
+        databaseService.runMigrationsAsync(getName())
+            .thenAccept(count -> {
+                getLogger().info("Applied " + count + " migrations");
+            });
+    }
+    
+    // Migration implementation example
+    private static class CreateInitialTables implements Migration {
+        @Override
+        public int getVersion() {
+            return 1;
+        }
+        
+        @Override
+        public String getDescription() {
+            return "Create initial tables";
+        }
+        
+        @Override
+        public void migrate(Connection connection) throws SQLException {
+            try (Statement stmt = connection.createStatement()) {
+                stmt.execute("CREATE TABLE players (" +
+                             "id INT AUTO_INCREMENT PRIMARY KEY, " +
+                             "name VARCHAR(100) NOT NULL, " +
+                             "level INT NOT NULL DEFAULT 1)");
+            }
+        }
+        
+        @Override
+        public void rollback(Connection connection) throws SQLException {
+            try (Statement stmt = connection.createStatement()) {
+                stmt.execute("DROP TABLE IF EXISTS players");
+            }
+        }
+    }
+}
+```
 
-### Database Interface
+## Advanced Features
 
-The `Database` interface provides the following methods:
+### BungeeSupport and Shared Databases
 
-- `query(String sql, RowMapper<T> mapper, Object... params)`: Execute a query and map results
-- `queryFirst(String sql, RowMapper<T> mapper, Object... params)`: Execute a query and map the first result
-- `update(String sql, Object... params)`: Execute an update query
-- `insert(String sql, Object... params)`: Execute an insert query and return generated keys
-- `batchUpdate(String sql, List<Object[]> batchParams)`: Execute a batch update
-- `transaction(TransactionCallback<T> callback)`: Execute operations in a transaction
-- `createQueryBuilder()`: Create a query builder
+If you're running a BungeeCord network, you can enable shared databases:
+
+```java
+// Check if shared database is available
+databaseService.getSharedDatabase().ifPresent(sharedDb -> {
+    // Use shared database for cross-server data
+    try {
+        sharedDb.update("INSERT INTO global_stats (player, value) VALUES (?, ?)",
+                      "PlayerName", 100);
+    } catch (SQLException e) {
+        e.printStackTrace();
+    }
+});
+
+// Or with the BungeeSupport directly
+if (plugin instanceof SqlBridgePlugin) {
+    SqlBridgePlugin sqlBridgePlugin = (SqlBridgePlugin) plugin;
+    BungeeSupport bungeeSupport = sqlBridgePlugin.getBungeeSupport();
+    
+    if (bungeeSupport != null) {
+        SharedDatabaseManager sharedManager = bungeeSupport.getSharedDatabaseManager();
+        
+        // Store a value accessible by all servers
+        sharedManager.set("global.player.count", "42")
+            .thenAccept(v -> System.out.println("Value set successfully"));
+    }
+}
+```
+
+### Performance Monitoring
+
+```java
+// Get database statistics
+Map<String, Object> stats = databaseService.getStatistics();
+
+// Log some key metrics
+System.out.println("Total queries: " + stats.get("totalQueries"));
+System.out.println("Average query time: " + stats.get("averageQueryTime") + "ms");
+System.out.println("Slow queries: " + stats.get("slowQueries"));
+```
 
 ## Troubleshooting
 
@@ -209,25 +478,10 @@ The `Database` interface provides the following methods:
 
 To enable detailed logging for troubleshooting:
 
-1. Set `logging.level: DEBUG` in the configuration
-2. Set `logging.log-queries: true` to log all SQL queries
-3. Restart the server
-4. Check the server logs for detailed information
-
-## Contributing
-
-Contributions are welcome! Here's how you can contribute:
-
-1. Fork the repository
-2. Create a feature branch: `git checkout -b my-new-feature`
-3. Commit your changes: `git commit -am 'Add some feature'`
-4. Push to the branch: `git push origin my-new-feature`
-5. Submit a pull request
+1. Set `debug: true` in the configuration
+2. Restart the server
+3. Check the server logs for detailed information
 
 ## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
-
-## Contact
-
-For support or questions, open an issue on the GitHub repository or contact us at support@example.com.
