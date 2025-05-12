@@ -16,11 +16,15 @@ Core utilities and service framework for Minecraft plugins. Provides:
 
 ### SQL-Bridge
 
-Database connectivity plugin built on top of Core-Utils. Features:
-- Connection pooling with multiple database drivers
-- Query utilities and SQL injection prevention
-- Transactional support
-- Performance monitoring
+High-performance database connectivity plugin built on top of Core-Utils. Features:
+- Multi-database support (MySQL, PostgreSQL, SQLite, H2)
+- Connection pooling with HikariCP
+- Query builder with fluent API
+- Transaction and batch operation support
+- Schema migration system
+- SQL injection prevention
+- Performance monitoring and metrics
+- BungeeCord support for cross-server database sharing
 
 ### Example-Plugin
 
@@ -58,14 +62,63 @@ Each plugin has its own configuration files and commands:
 
 #### SQL-Bridge
 ```
+/sqlbridge info - Display plugin information
 /sqlbridge status - Check database connection status
-/sqlbridge metrics - View performance metrics
+/sqlbridge test - Test database connectivity
+/sqlbridge migrations - Show migration status
+/sqlbridge errors - View recent database errors
 ```
 
 #### Example-Plugin
 ```
 /example help - Show command help
 /exampledb - Access database features
+```
+
+### For Plugin Developers
+
+#### Using Core-Utils
+```java
+// Register a service
+ServiceRegistry.register(MyService.class, myServiceImpl);
+
+// Get a registered service
+MyService service = ServiceRegistry.getService(MyService.class);
+
+// Register commands with annotations
+@Command(name = "mycommand", description = "My custom command")
+public class MyCommand {
+    @SubCommand(name = "test", description = "Test subcommand")
+    public void testCommand(CommandSender sender, String[] args) {
+        // Command implementation
+    }
+}
+```
+
+#### Using SQL-Bridge
+```java
+// Get database service
+DatabaseService dbService = ServiceRegistry.getService(DatabaseService.class);
+Database db = dbService.getDatabaseForPlugin(yourPlugin.getName());
+
+// Execute queries with result mapping
+List<Player> players = db.query(
+    "SELECT * FROM players WHERE level > ?",
+    row -> {
+        Player player = new Player();
+        player.setId(row.getInt("id"));
+        player.setName(row.getString("name"));
+        player.setLevel(row.getInt("level"));
+        return player;
+    },
+    10
+);
+
+// Use the query builder API
+int rowsAffected = db.update("players")
+    .set("level", 5)
+    .where("name = ?", "PlayerName")
+    .executeUpdate();
 ```
 
 ## ⚙️ Configuration
@@ -82,12 +135,31 @@ debug: false
 ```yaml
 # config.yml
 database:
-  type: MYSQL
-  host: localhost
-  port: 3306
-  database: minecraft
-  username: user
-  password: pass
+  type: MYSQL    # MYSQL, SQLITE, POSTGRESQL, H2
+  
+  # MySQL configuration
+  mysql:
+    host: localhost
+    port: 3306
+    database: minecraft
+    username: user
+    password: pass
+    auto-create-database: true
+    
+    # Connection pool settings
+    pool:
+      maximum-pool-size: 10
+      minimum-idle: 5
+    
+  # SQLite configuration
+  sqlite:
+    file: database.db
+    wal-mode: true
+
+# Performance monitoring
+monitoring:
+  enabled: true
+  slow-query-threshold: 1000
 ```
 
 ### Example-Plugin
@@ -104,5 +176,5 @@ Each plugin is licensed under the MIT License - see individual plugin directorie
 
 ## 📚 Documentation
 
-- Check each plugin's dedicated documentation for detailed information
+- Check each plugin's dedicated README.md for detailed information
 - For version history and changes, see the [Releases](../../releases) page
