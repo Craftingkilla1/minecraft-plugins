@@ -454,6 +454,72 @@ hs_err_pid*
                 println "Released version ${project.version} to GitHub"
             }
         }
+        
+        // Task to clean tracked files that are now in .gitignore
+        project.task('gitCleanIgnored') {
+            group = 'github'
+            description = 'Remove previously committed files that are now in .gitignore from the repository'
+            
+            doLast {
+                println "Checking for tracked files that should be ignored..."
+                
+                // Get list of tracked files that are ignored according to current rules
+                def ignoredFiles = executeCommand(project, "git ls-files -ci --exclude-standard")
+                
+                if (ignoredFiles.trim().isEmpty()) {
+                    println "No tracked files found that should be ignored."
+                } else {
+                    // Display the files that will be removed from tracking
+                    println "The following files will be removed from Git tracking (but kept on disk):"
+                    ignoredFiles.split('\n').each { file ->
+                        if (!file.trim().isEmpty()) {
+                            println "  - ${file}"
+                        }
+                    }
+                    
+                    // Check if we should skip confirmation (for CI/CD or non-interactive environments)
+                    boolean skipConfirmation = project.hasProperty('skipConfirmation') && 
+                        project.property('skipConfirmation').toString().toBoolean()
+                    
+                    boolean proceed = skipConfirmation
+                    
+                    if (!skipConfirmation) {
+                        // Try to get confirmation from the user
+                        try {
+                            def scanner = new java.util.Scanner(System.in)
+                            print "Do you want to proceed? (y/n): "
+                            def answer = scanner.nextLine().trim().toLowerCase()
+                            proceed = (answer == 'y' || answer == 'yes')
+                        } catch (Exception e) {
+                            println "Could not get user input. Use -PskipConfirmation=true to skip confirmation."
+                            println "Operation cancelled."
+                            return
+                        }
+                    } else {
+                        println "Skipping confirmation as requested."
+                    }
+                    
+                    if (proceed) {
+                        // Get the list of files to remove from tracking
+                        ignoredFiles.split('\n').each { file ->
+                            if (!file.trim().isEmpty()) {
+                                println "Removing ${file} from Git tracking..."
+                                executeCommand(project, "git rm --cached \"${file}\"")
+                            }
+                        }
+                        
+                        // Commit the changes
+                        println "Committing changes..."
+                        executeCommand(project, "git commit -m \"Remove ignored files from Git tracking\"")
+                        
+                        println "Successfully removed ignored files from Git tracking. They remain on disk but are no longer tracked."
+                        println "Use 'git push' to update the remote repository."
+                    } else {
+                        println "Operation cancelled."
+                    }
+                }
+            }
+        }
     }
     
     boolean checkRepoExists(String username, String repo, String token) {
