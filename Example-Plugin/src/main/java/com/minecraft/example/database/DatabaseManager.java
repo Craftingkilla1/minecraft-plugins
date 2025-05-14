@@ -10,7 +10,7 @@ import com.minecraft.example.database.migration.CreateInitialTables;
 import com.minecraft.example.database.migration.AddIndexesMigration;
 import com.minecraft.sqlbridge.api.Database;
 import com.minecraft.sqlbridge.api.DatabaseService;
-import com.minecraft.sqlbridge.api.Migration;
+import com.minecraft.sqlbridge.api.migration.Migration;
 
 import java.sql.SQLException;
 import java.util.ArrayList;

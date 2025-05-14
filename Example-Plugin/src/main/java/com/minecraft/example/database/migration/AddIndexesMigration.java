@@ -1,7 +1,7 @@
 // ./Example-Plugin/src/main/java/com/minecraft/example/database/migration/AddIndexesMigration.java
 package com.minecraft.example.database.migration;
 
-import com.minecraft.sqlbridge.api.Migration;
+import com.minecraft.sqlbridge.api.migration.Migration;
 
 import java.sql.Connection;
 import java.sql.SQLException;
