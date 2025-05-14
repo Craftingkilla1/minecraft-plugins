@@ -45,9 +45,22 @@ dependencies {
     testImplementation 'org.mockito:mockito-core:5.5.0'
 }
 
-// We're going to disable the standard jar completely
-// This ensures only the shadowJar gets used in the publication
-jar.enabled = false
+// IMPORTANT: We need to keep the regular JAR for the API
+// but we'll ensure it only contains the API classes
+jar {
+    // Ensure it still generates a jar
+    enabled = true
+    
+    // This will be the API jar
+    archiveClassifier.set('api')
+
+    // Only include the API package - VERY IMPORTANT
+    // This ensures the API jar only contains the public API
+    include 'com/minecraft/sqlbridge/api/**'
+    
+    // Clean up output
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
 
 // Configure the shadow jar with appropriate settings
 shadowJar {
@@ -64,6 +77,27 @@ shadowJar {
     
     // Merge service files properly (needed for JDBC driver registration)
     mergeServiceFiles()
+    
+    // Clean up output
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
+
+// Add this task to expose API classes to dependent projects
+task explodeApi(type: Copy) {
+    from sourceSets.main.output
+    into "${buildDir}/exploded-api"
+    include 'com/minecraft/sqlbridge/api/**'
+}
+
+// Make sure dependent projects can access our classes during compilation
+tasks.named('classes').configure {
+    finalizedBy(explodeApi)
+}
+
+// Make dependent projects compile against our API
+project.afterEvaluate {
+    configurations.apiElements.outgoing.artifacts.clear()
+    configurations.apiElements.outgoing.artifact(jar)
 }
 
 // Make compileJava depend on Core-Utils shadow jar
@@ -71,7 +105,7 @@ tasks.named('compileJava') {
     dependsOn(':Core-Utils:shadowJar')
 }
 
-// Set shadowJar as the default jar
+// Set shadowJar as the default jar for distribution
 tasks.named('assemble') {
     dependsOn shadowJar
 }
@@ -85,5 +119,11 @@ java {
     targetCompatibility = JavaVersion.VERSION_1_8
 }
 
-// Remove any custom publishing configuration
-// Root build.gradle already handles publishing for all subprojects
+// Ensure both JARs (API and full) are in the archives configuration
+artifacts {
+    // The shadow jar will be the main artifact for deployment
+    archives(shadowJar)
+    
+    // The API jar will be used for compilation by other projects
+    archives(jar)
+}
