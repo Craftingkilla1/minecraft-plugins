@@ -1,3 +1,4 @@
+// ./Core-Utils/src/main/java/com/minecraft/core/config/ConfigManager.java
 package com.minecraft.core.config;
 
 import com.minecraft.core.CorePlugin;
@@ -156,5 +157,15 @@ public class ConfigManager {
      */
     public Messages createMessages() {
         return new Messages(plugin);
+    }
+    
+    /**
+     * Create a messages configuration with a custom filename
+     * 
+     * @param filename The filename (without .yml extension)
+     * @return The messages configuration
+     */
+    public Messages createMessages(String filename) {
+        return new Messages(plugin, filename);
     }
 }

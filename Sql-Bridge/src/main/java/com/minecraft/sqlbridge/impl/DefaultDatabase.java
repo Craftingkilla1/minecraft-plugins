@@ -16,6 +16,7 @@ import com.minecraft.sqlbridge.error.DatabaseException;
 import com.minecraft.sqlbridge.monitoring.QueryStatistics;
 import com.minecraft.sqlbridge.security.QueryValidator;
 import com.minecraft.sqlbridge.impl.query.DefaultDeleteBuilder;
+import com.minecraft.sqlbridge.impl.query.QueryErrorHelper;
 import com.minecraft.sqlbridge.dialect.Dialect;
 import com.minecraft.sqlbridge.dialect.MySQLDialect;
 import com.minecraft.sqlbridge.dialect.SQLiteDialect;
@@ -31,6 +32,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
@@ -103,7 +105,8 @@ public class DefaultDatabase implements Database {
         } catch (SQLException e) {
             LogUtil.severe("SQL error executing query: " + e.getMessage());
             queryStatistics.recordFailedQuery(sql);
-            throw e;
+            // Enhance the exception with more helpful information
+            throw QueryErrorHelper.enhanceException(e, sql);
         }
     }
 
@@ -150,7 +153,8 @@ public class DefaultDatabase implements Database {
         } catch (SQLException e) {
             LogUtil.severe("SQL error executing update: " + e.getMessage());
             queryStatistics.recordFailedUpdate(sql);
-            throw e;
+            // Enhance the exception with more helpful information
+            throw QueryErrorHelper.enhanceException(e, sql);
         }
     }
 
@@ -192,7 +196,8 @@ public class DefaultDatabase implements Database {
         } catch (SQLException e) {
             LogUtil.severe("SQL error executing batch update: " + e.getMessage());
             queryStatistics.recordFailedBatchUpdate(sql);
-            throw e;
+            // Enhance the exception with more helpful information
+            throw QueryErrorHelper.enhanceException(e, sql);
         }
     }
 
@@ -256,7 +261,8 @@ public class DefaultDatabase implements Database {
             }
             
             if (e instanceof SQLException) {
-                throw (SQLException) e;
+                // Enhance the exception with more helpful information
+                throw QueryErrorHelper.enhanceException((SQLException) e, "Transaction");
             } else {
                 throw new DatabaseException("Error executing transaction", e);
             }
@@ -305,7 +311,8 @@ public class DefaultDatabase implements Database {
         } catch (SQLException e) {
             LogUtil.severe("SQL error executing query with consumer: " + e.getMessage());
             queryStatistics.recordFailedQuery(sql);
-            throw e;
+            // Enhance the exception with more helpful information
+            throw QueryErrorHelper.enhanceException(e, sql);
         }
     }
 

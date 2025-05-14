@@ -1,3 +1,4 @@
+// ./Core-Utils/src/main/java/com/minecraft/core/config/Messages.java
 package com.minecraft.core.config;
 
 import org.bukkit.ChatColor;
@@ -41,11 +42,36 @@ public class Messages {
     }
     
     /**
+     * Create a new messages instance with a custom file name
+     * 
+     * @param plugin The plugin instance
+     * @param filename The filename (without .yml extension)
+     */
+    public Messages(Plugin plugin, String filename) {
+        this.plugin = plugin;
+        this.messagesFile = new File(plugin.getDataFolder(), filename + ".yml");
+        
+        createDefaultMessages();
+        loadMessages();
+    }
+    
+    /**
      * Create the default messages file if it doesn't exist
      */
     private void createDefaultMessages() {
         if (!messagesFile.exists()) {
-            plugin.saveResource("messages.yml", false);
+            try {
+                String resourceName = messagesFile.getName();
+                plugin.saveResource(resourceName, false);
+            } catch (IllegalArgumentException e) {
+                // Resource doesn't exist, create empty file
+                try {
+                    messagesFile.getParentFile().mkdirs();
+                    messagesFile.createNewFile();
+                } catch (IOException ex) {
+                    plugin.getLogger().severe("Failed to create messages file: " + ex.getMessage());
+                }
+            }
         }
     }
     
@@ -183,6 +209,18 @@ public class Messages {
     }
     
     /**
+     * Send a message to a player with replacements as key-value pairs
+     * 
+     * @param player The player
+     * @param path The path to the message
+     * @param replacements The replacements (key1, value1, key2, value2, ...)
+     */
+    public void sendMessage(Player player, String path, String... replacements) {
+        String message = getFormattedMessage(path, replacements);
+        player.sendMessage(ChatColor.translateAlternateColorCodes('&', prefix + message));
+    }
+    
+    /**
      * Send a message to a command sender
      * 
      * @param sender The command sender
@@ -206,6 +244,18 @@ public class Messages {
     }
     
     /**
+     * Send a message to a command sender with replacements as key-value pairs
+     * 
+     * @param sender The command sender
+     * @param path The path to the message
+     * @param replacements The replacements (key1, value1, key2, value2, ...)
+     */
+    public void sendMessage(CommandSender sender, String path, String... replacements) {
+        String message = getFormattedMessage(path, replacements);
+        sender.sendMessage(ChatColor.translateAlternateColorCodes('&', prefix + message));
+    }
+    
+    /**
      * Send an error message to a player
      * 
      * @param player The player
@@ -213,6 +263,18 @@ public class Messages {
      */
     public void sendErrorMessage(Player player, String path) {
         String message = getMessage(path);
+        player.sendMessage(ChatColor.translateAlternateColorCodes('&', errorPrefix + message));
+    }
+    
+    /**
+     * Send an error message to a player with replacements
+     * 
+     * @param player The player
+     * @param path The path to the message
+     * @param replacements The replacements (key1, value1, key2, value2, ...)
+     */
+    public void sendErrorMessage(Player player, String path, String... replacements) {
+        String message = getFormattedMessage(path, replacements);
         player.sendMessage(ChatColor.translateAlternateColorCodes('&', errorPrefix + message));
     }
     
@@ -228,6 +290,18 @@ public class Messages {
     }
     
     /**
+     * Send an error message to a command sender with replacements
+     * 
+     * @param sender The command sender
+     * @param path The path to the message
+     * @param replacements The replacements (key1, value1, key2, value2, ...)
+     */
+    public void sendErrorMessage(CommandSender sender, String path, String... replacements) {
+        String message = getFormattedMessage(path, replacements);
+        sender.sendMessage(ChatColor.translateAlternateColorCodes('&', errorPrefix + message));
+    }
+    
+    /**
      * Send a success message to a player
      * 
      * @param player The player
@@ -239,6 +313,18 @@ public class Messages {
     }
     
     /**
+     * Send a success message to a player with replacements
+     * 
+     * @param player The player
+     * @param path The path to the message
+     * @param replacements The replacements (key1, value1, key2, value2, ...)
+     */
+    public void sendSuccessMessage(Player player, String path, String... replacements) {
+        String message = getFormattedMessage(path, replacements);
+        player.sendMessage(ChatColor.translateAlternateColorCodes('&', successPrefix + message));
+    }
+    
+    /**
      * Send a success message to a command sender
      * 
      * @param sender The command sender
@@ -246,6 +332,18 @@ public class Messages {
      */
     public void sendSuccessMessage(CommandSender sender, String path) {
         String message = getMessage(path);
+        sender.sendMessage(ChatColor.translateAlternateColorCodes('&', successPrefix + message));
+    }
+    
+    /**
+     * Send a success message to a command sender with replacements
+     * 
+     * @param sender The command sender
+     * @param path The path to the message
+     * @param replacements The replacements (key1, value1, key2, value2, ...)
+     */
+    public void sendSuccessMessage(CommandSender sender, String path, String... replacements) {
+        String message = getFormattedMessage(path, replacements);
         sender.sendMessage(ChatColor.translateAlternateColorCodes('&', successPrefix + message));
     }
     

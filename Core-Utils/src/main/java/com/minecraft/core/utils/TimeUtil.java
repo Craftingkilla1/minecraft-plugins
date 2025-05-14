@@ -1,3 +1,4 @@
+// ./Core-Utils/src/main/java/com/minecraft/core/utils/TimeUtil.java
 package com.minecraft.core.utils;
 
 import java.time.Duration;
@@ -20,10 +21,38 @@ public class TimeUtil {
     /**
      * Format seconds into a readable time string (e.g., 1h 30m 15s)
      * 
-     * @param seconds The number of seconds
+     * @param seconds The number of seconds as an int
      * @return A formatted time string
      */
     public static String formatTime(int seconds) {
+        if (seconds < 0) {
+            return "0s";
+        }
+        
+        long hours = TimeUnit.SECONDS.toHours(seconds);
+        long minutes = TimeUnit.SECONDS.toMinutes(seconds) % 60;
+        long secs = seconds % 60;
+        
+        StringBuilder builder = new StringBuilder();
+        if (hours > 0) {
+            builder.append(hours).append("h ");
+        }
+        if (minutes > 0 || hours > 0) {
+            builder.append(minutes).append("m ");
+        }
+        builder.append(secs).append("s");
+        
+        return builder.toString();
+    }
+    
+    /**
+     * Format seconds into a readable time string (e.g., 1h 30m 15s)
+     * This overload handles long values for seconds
+     * 
+     * @param seconds The number of seconds as a long
+     * @return A formatted time string
+     */
+    public static String formatTime(long seconds) {
         if (seconds < 0) {
             return "0s";
         }
@@ -59,7 +88,7 @@ public class TimeUtil {
         Duration duration = Duration.between(from, to);
         long seconds = duration.getSeconds();
         
-        return formatTime((int) seconds);
+        return formatTime(seconds);
     }
     
     /**

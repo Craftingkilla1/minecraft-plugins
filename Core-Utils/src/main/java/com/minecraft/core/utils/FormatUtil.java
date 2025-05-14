@@ -1,3 +1,4 @@
+// ./Core-Utils/src/main/java/com/minecraft/core/utils/FormatUtil.java
 package com.minecraft.core.utils;
 
 import org.bukkit.ChatColor;
@@ -142,5 +143,33 @@ public class FormatUtil {
             return text;
         }
         return text.substring(0, maxLength) + "...";
+    }
+    
+    /**
+     * Capitalize the first letter of each word in a string
+     * @param text The text to capitalize
+     * @return The capitalized text
+     */
+    public static String capitalizeWords(String text) {
+        if (text == null || text.isEmpty()) {
+            return text;
+        }
+        
+        StringBuilder result = new StringBuilder();
+        String[] words = text.split("\\s+");
+        
+        for (int i = 0; i < words.length; i++) {
+            String word = words[i];
+            if (!word.isEmpty()) {
+                result.append(Character.toUpperCase(word.charAt(0)))
+                      .append(word.length() > 1 ? word.substring(1).toLowerCase() : "");
+            }
+            
+            if (i < words.length - 1) {
+                result.append(" ");
+            }
+        }
+        
+        return result.toString();
     }
 }

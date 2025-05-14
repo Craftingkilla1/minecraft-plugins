@@ -22,6 +22,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 import java.util.logging.Level;
@@ -434,6 +435,55 @@ public interface Database {
         } catch (SQLException e) {
             logger.log(Level.SEVERE, "Transaction failed", e);
             return null;
+        }
+    }
+    
+    /**
+     * Find a record by UUID.
+     * This is a convenience method for Minecraft plugins.
+     *
+     * @param sql The SQL query with a UUID parameter
+     * @param mapper The mapper to convert results to objects
+     * @param uuid The UUID to search for
+     * @param <T> The type of object to return
+     * @return An Optional containing the result, or empty if not found
+     * @throws SQLException If an error occurs during execution
+     */
+    default <T> Optional<T> findByUuid(String sql, ResultMapper<T> mapper, UUID uuid) throws SQLException {
+        return queryFirst(sql, mapper, uuid.toString());
+    }
+
+    /**
+     * Find a record by UUID asynchronously.
+     * This is a convenience method for Minecraft plugins.
+     *
+     * @param sql The SQL query with a UUID parameter
+     * @param mapper The mapper to convert results to objects
+     * @param uuid The UUID to search for
+     * @param <T> The type of object to return
+     * @return A CompletableFuture containing an Optional with the result
+     */
+    default <T> CompletableFuture<Optional<T>> findByUuidAsync(String sql, ResultMapper<T> mapper, UUID uuid) {
+        return queryFirstAsync(sql, mapper, uuid.toString());
+    }
+
+    /**
+     * Find a record by UUID with safe error handling.
+     * This is a convenience method for Minecraft plugins.
+     *
+     * @param sql The SQL query with a UUID parameter
+     * @param mapper The mapper to convert results to objects
+     * @param uuid The UUID to search for
+     * @param logger The logger to use for error logging
+     * @param <T> The type of object to return
+     * @return An Optional containing the result, or empty if not found or an error occurs
+     */
+    default <T> Optional<T> findByUuidSafe(String sql, ResultMapper<T> mapper, UUID uuid, Logger logger) {
+        try {
+            return findByUuid(sql, mapper, uuid);
+        } catch (SQLException e) {
+            logger.log(Level.SEVERE, "Error finding by UUID: " + uuid, e);
+            return Optional.empty();
         }
     }
 }
