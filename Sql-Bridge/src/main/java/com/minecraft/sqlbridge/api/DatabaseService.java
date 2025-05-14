@@ -1,7 +1,7 @@
 // ./Sql-Bridge/src/main/java/com/minecraft/sqlbridge/api/DatabaseService.java
 package com.minecraft.sqlbridge.api;
 
-import com.minecraft.sqlbridge.migration.Migration;
+import com.minecraft.sqlbridge.api.migration.Migration;
 
 import org.bukkit.plugin.Plugin;
 

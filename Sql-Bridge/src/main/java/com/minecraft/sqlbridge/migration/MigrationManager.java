@@ -3,6 +3,7 @@ package com.minecraft.sqlbridge.migration;
 
 import com.minecraft.core.utils.LogUtil;
 import com.minecraft.sqlbridge.SqlBridgePlugin;
+import com.minecraft.sqlbridge.api.migration.Migration;
 import com.minecraft.sqlbridge.connection.ConnectionManager;
 import com.minecraft.sqlbridge.error.DatabaseException;
 

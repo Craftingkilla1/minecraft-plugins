@@ -5,6 +5,7 @@ import com.minecraft.sqlbridge.api.Database;
 import com.minecraft.sqlbridge.api.DatabaseService;
 import com.minecraft.sqlbridge.api.callback.DatabaseCallback;
 import com.minecraft.sqlbridge.api.callback.DatabaseResultCallback;
+import com.minecraft.sqlbridge.api.migration.Migration;
 import com.minecraft.sqlbridge.api.query.DeleteBuilder;
 import com.minecraft.sqlbridge.api.query.InsertBuilder;
 import com.minecraft.sqlbridge.api.query.SelectBuilder;
@@ -17,7 +18,10 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerJoinEvent;
 
+import java.sql.Connection;
 import java.sql.SQLException;
+import java.sql.Statement;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -47,6 +51,9 @@ public class SqlBridgeExample extends JavaPlugin implements Listener {
         
         // Initialize the database
         initializeDatabase();
+        
+        // Register migrations
+        registerMigrations();
         
         // Register events
         getServer().getPluginManager().registerEvents(this, this);
@@ -80,6 +87,73 @@ public class SqlBridgeExample extends JavaPlugin implements Listener {
         } else {
             getLogger().warning("There were issues initializing the database.");
         }
+    }
+    
+    /**
+     * Register migrations for schema changes.
+     */
+    private void registerMigrations() {
+        List<Migration> migrations = new ArrayList<>();
+        
+        // Add initial migration
+        migrations.add(new Migration() {
+            @Override
+            public int getVersion() {
+                return 1;
+            }
+            
+            @Override
+            public String getDescription() {
+                return "Initial migration";
+            }
+            
+            @Override
+            public void migrate(Connection connection) throws SQLException {
+                // This migration is handled by initializeDatabase, just a placeholder
+            }
+            
+            @Override
+            public void rollback(Connection connection) throws SQLException {
+                try (Statement stmt = connection.createStatement()) {
+                    stmt.execute("DROP TABLE IF EXISTS player_stats");
+                    stmt.execute("DROP TABLE IF EXISTS players");
+                }
+            }
+        });
+        
+        // Example of a second migration that adds a new column
+        migrations.add(new Migration() {
+            @Override
+            public int getVersion() {
+                return 2;
+            }
+            
+            @Override
+            public String getDescription() {
+                return "Add playtime column to player_stats";
+            }
+            
+            @Override
+            public void migrate(Connection connection) throws SQLException {
+                try (Statement stmt = connection.createStatement()) {
+                    stmt.execute("ALTER TABLE player_stats ADD COLUMN playtime BIGINT DEFAULT 0");
+                }
+            }
+            
+            @Override
+            public void rollback(Connection connection) throws SQLException {
+                try (Statement stmt = connection.createStatement()) {
+                    stmt.execute("ALTER TABLE player_stats DROP COLUMN playtime");
+                }
+            }
+        });
+        
+        // Register migrations with the database service
+        databaseService.registerMigrations(this, migrations);
+        
+        // Run migrations
+        int appliedCount = databaseService.runMigrationsSafe(this);
+        getLogger().info("Applied " + appliedCount + " migrations.");
     }
     
     /**
