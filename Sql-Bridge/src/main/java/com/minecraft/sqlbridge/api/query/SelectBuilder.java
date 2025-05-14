@@ -9,7 +9,7 @@ public interface SelectBuilder extends QueryBuilder {
     /**
      * Specify the columns to select.
      *
-     * @param columns The columns to select
+     * @param columns The column names
      * @return This SelectBuilder for chaining
      */
     SelectBuilder columns(String... columns);
@@ -52,7 +52,7 @@ public interface SelectBuilder extends QueryBuilder {
     /**
      * Add a JOIN clause to the query.
      *
-     * @param type The join type (INNER, LEFT, RIGHT, etc.)
+     * @param type The type of join (INNER, LEFT, RIGHT, etc.)
      * @param table The table to join
      * @param condition The join condition
      * @return This SelectBuilder for chaining
@@ -133,4 +133,38 @@ public interface SelectBuilder extends QueryBuilder {
      * @return This SelectBuilder for chaining
      */
     SelectBuilder forUpdate();
+    
+    /**
+     * Execute the SELECT query and return the first result with safe error handling.
+     *
+     * @param mapper The mapper to convert result sets to objects
+     * @param logger The logger to use for error logging
+     * @param <T> The type of object to return
+     * @return An Optional containing the first result, or empty if no results or an error occurs
+     */
+    default <T> java.util.Optional<T> executeQueryFirstSafe(com.minecraft.sqlbridge.api.result.ResultMapper<T> mapper, java.util.logging.Logger logger) {
+        try {
+            return executeQueryFirst(mapper);
+        } catch (java.sql.SQLException e) {
+            logger.log(java.util.logging.Level.SEVERE, "Query first failed: " + getSQL(), e);
+            return java.util.Optional.empty();
+        }
+    }
+    
+    /**
+     * Execute the SELECT query and map the results with safe error handling.
+     *
+     * @param mapper The mapper to convert result sets to objects
+     * @param logger The logger to use for error logging
+     * @param <T> The type of objects to return
+     * @return A list of mapped objects, or an empty list if an error occurs
+     */
+    default <T> java.util.List<T> executeQuerySafe(com.minecraft.sqlbridge.api.result.ResultMapper<T> mapper, java.util.logging.Logger logger) {
+        try {
+            return executeQuery(mapper);
+        } catch (java.sql.SQLException e) {
+            logger.log(java.util.logging.Level.SEVERE, "Query failed: " + getSQL(), e);
+            return java.util.Collections.emptyList();
+        }
+    }
 }

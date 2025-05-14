@@ -1,40 +1,84 @@
 # SQL-Bridge
 
-A high-performance database connectivity plugin for Minecraft servers, providing a robust API for SQL database operations with comprehensive monitoring and performance optimization.
+A high-performance database connectivity plugin for Minecraft servers that provides a robust, user-friendly API for SQL database operations with comprehensive monitoring and error handling.
+
+![SQL-Bridge Banner](https://i.imgur.com/placeholder.png)
+
+## Table of Contents
+
+- [Features](#features)
+- [Installation](#installation)
+- [Configuration](#configuration)
+- [Quick Start Guide](#quick-start-guide)
+- [Core Concepts](#core-concepts)
+- [API Reference](#api-reference)
+  - [DatabaseService](#databaseservice)
+  - [Database](#database)
+  - [Query Builders](#query-builders)
+  - [Result Mapping](#result-mapping)
+  - [Transactions](#transactions)
+  - [Migrations](#migrations)
+  - [Error Handling](#error-handling)
+  - [Callback Support](#callback-support)
+- [Advanced Features](#advanced-features)
+  - [Connection Pooling](#connection-pooling)
+  - [Performance Monitoring](#performance-monitoring)
+  - [BungeeSupport](#bungeesupport)
+  - [Security Features](#security-features)
+- [Best Practices](#best-practices)
+- [Troubleshooting](#troubleshooting)
+- [Example Projects](#example-projects)
+- [Contributing](#contributing)
+- [License](#license)
 
 ## Features
 
 - **Multi-Database Support**: Connect to MySQL, PostgreSQL, SQLite, and H2 databases
 - **Connection Pooling**: Efficient connection management with HikariCP
-- **Performance Monitoring**: Real-time metrics collection for database operations
-- **Query Builder**: Fluent API for building SQL queries
+- **Fluent Query API**: Build SQL queries with intuitive Java methods
+- **Type-Safe Results**: Map query results to Java objects
+- **Flexible Execution**: Synchronous, asynchronous, or callback-based operations
 - **Transaction Support**: Simplified transaction management
-- **Batch Operations**: Execute multiple queries efficiently
-- **Comprehensive Error Handling**: Robust exception management for stable operation
-- **Extensible API**: Easy integration with other plugins
-- **Monitoring Dashboards**: Track database performance with built-in metrics
-- **Scalable Architecture**: Designed for high-traffic Minecraft servers
-- **Migration System**: Manage database schema versions and migrations
-- **BungeeCord Support**: Share database connections across a network of servers
-
-## Requirements
-
-- Java 8 or higher
-- Bukkit/Spigot/Paper server 1.12.2 or higher
-- CoreUtils plugin
-- Database server (MySQL, PostgreSQL) or file-based database (SQLite, H2)
+- **Migration System**: Database schema versioning and migrations
+- **Comprehensive Error Handling**: Robust exception management
+- **Performance Monitoring**: Real-time metrics collection
+- **Security Features**: SQL injection protection and query validation
+- **BungeeSupport**: Share database connections across a network of servers
+- **Debug Tools**: Extensive logging and error tracking
 
 ## Installation
 
+### Requirements
+
+- Java 8 or higher
+- Bukkit/Spigot/Paper server 1.12.2 or higher
+- Core-Utils plugin (dependency)
+
+### Steps
+
 1. Download the latest release from the [releases page](https://github.com/yourusername/sql-bridge/releases)
-2. Place the JAR file in your server's `plugins` directory
+2. Place `SQL-Bridge.jar` and `Core-Utils.jar` in your server's `plugins` directory
 3. Start or restart your server
-4. Edit the configuration file at `plugins/SQL-Bridge/config.yml`
+4. Configure SQL-Bridge in `plugins/SQL-Bridge/config.yml`
 5. Restart your server again to apply the configuration
+
+### Adding SQL-Bridge to Your Plugin
+
+Add SQL-Bridge as a dependency in your `plugin.yml`:
+
+```yaml
+depend: [Core-Utils, SQL-Bridge]
+```
+
+Or as a soft dependency if your plugin can function without it:
+
+```yaml
+softdepend: [Core-Utils, SQL-Bridge]
+```
 
 ## Configuration
 
-The plugin creates a default configuration file at `plugins/SQL-Bridge/config.yml`. Here's a sample configuration:
+SQL-Bridge creates a default configuration file at `plugins/SQL-Bridge/config.yml`. Below is an explanation of key configuration options:
 
 ```yaml
 # Debug mode - enables additional logging
@@ -42,10 +86,10 @@ debug: false
 
 # Database configuration
 database:
-  # Database type: MYSQL, POSTGRESQL, SQLITE, H2
+  # Database type: MYSQL, SQLITE, POSTGRESQL, H2
   type: sqlite
   
-  # MySQL configuration
+  # MySQL configuration (used when type is MYSQL)
   mysql:
     host: localhost
     port: 3306
@@ -65,10 +109,8 @@ database:
       maximum-lifetime: 1800000
       # Connection timeout in milliseconds
       connection-timeout: 5000
-      # Allow the pool to self-heal connection failures
-      auto-reconnect: true
 
-  # SQLite configuration
+  # SQLite configuration (used when type is SQLITE)
   sqlite:
     # Database file (relative to plugin folder)
     file: database.db
@@ -81,171 +123,173 @@ monitoring:
   enabled: true
   # Log slow queries that take longer than this many milliseconds
   slow-query-threshold: 1000
+  # Collect metrics data
+  collect-metrics: true
+  # Metrics collection interval in seconds
+  metrics-interval: 300
+
+# Security configuration
+security:
+  # Enable SQL injection detection
+  sql-injection-detection: true
+  # Log dangerous operations
+  log-dangerous-operations: true
+  # Maximum query length
+  max-query-length: 10000
+
+# BungeeSupport configuration
+bungee:
+  # Whether to enable BungeeSupport for multi-server setups
+  enabled: false
+  # Use shared database across BungeeCord network
+  shared-database: true
 ```
 
-## Developer Guide
+### Database Choice Considerations
 
-### Getting Started
+- **MySQL**: High-performance, supports multiple concurrent connections, requires external database server
+- **PostgreSQL**: Advanced features, good for complex queries, requires external database server
+- **SQLite**: Simple file-based database, good for small plugins, limited concurrent access
+- **H2**: High-performance embedded database, good balance between SQLite and MySQL
 
-SQL-Bridge uses a service-based architecture to provide database connectivity to your plugin. Here's how to integrate it with your plugin:
+## Quick Start Guide
 
-1. Add SQL-Bridge as a dependency in your `plugin.yml`:
-
-```yaml
-depend: [SQL-Bridge, CoreUtils]
-```
-
-2. Access the database service in your plugin:
+Here's how to quickly integrate SQL-Bridge into your plugin:
 
 ```java
-import com.minecraft.sqlbridge.api.DatabaseService;
-import com.minecraft.sqlbridge.api.Database;
-import com.minecraft.core.api.service.ServiceRegistry;
-
 public class YourPlugin extends JavaPlugin {
     private DatabaseService databaseService;
     private Database database;
     
     @Override
     public void onEnable() {
-        // Get the DatabaseService from the ServiceRegistry
-        databaseService = ServiceRegistry.getService(DatabaseService.class);
-        if (databaseService == null) {
-            getLogger().severe("Failed to get DatabaseService - is SQL-Bridge enabled?");
+        // Get Core-Utils service registry
+        if (!setupDatabaseService()) {
+            getLogger().severe("Failed to connect to database, disabling plugin!");
             getServer().getPluginManager().disablePlugin(this);
             return;
         }
         
-        // Get a database connection specific to your plugin
-        database = databaseService.getDatabaseForPlugin(getName());
-        
         // Initialize your database schema
-        initDatabase();
+        if (!initDatabase()) {
+            getLogger().severe("Failed to initialize database, disabling plugin!");
+            getServer().getPluginManager().disablePlugin(this);
+            return;
+        }
+        
+        getLogger().info("Database connection established successfully!");
     }
     
-    private void initDatabase() {
-        try {
-            // Create tables, etc.
-            database.update("CREATE TABLE IF NOT EXISTS my_table (" +
-                           "id INT AUTO_INCREMENT PRIMARY KEY, " +
-                           "name VARCHAR(100) NOT NULL, " +
-                           "value INT NOT NULL)");
-            
-            getLogger().info("Database initialized successfully!");
-        } catch (SQLException e) {
-            getLogger().severe("Failed to initialize database: " + e.getMessage());
-            e.printStackTrace();
+    private boolean setupDatabaseService() {
+        // Get the database service from Core-Utils
+        databaseService = ServiceRegistry.getService(DatabaseService.class);
+        if (databaseService == null) {
+            getLogger().severe("Could not find DatabaseService - is SQL-Bridge enabled?");
+            return false;
         }
+        
+        // Get a database connection for your plugin
+        database = databaseService.getDatabaseForPlugin(this);
+        return database != null;
+    }
+    
+    private boolean initDatabase() {
+        // Using the new initializeDatabase convenience method
+        return databaseService.initializeDatabase(this,
+            "CREATE TABLE IF NOT EXISTS players (" +
+            "id INT AUTO_INCREMENT PRIMARY KEY, " +
+            "name VARCHAR(100) NOT NULL, " +
+            "level INT NOT NULL DEFAULT 1, " +
+            "experience INT NOT NULL DEFAULT 0)"
+        );
+    }
+    
+    @Override
+    public void onDisable() {
+        // Clean up happens automatically with SQL-Bridge
     }
 }
 ```
 
-### Basic Database Operations
+## Core Concepts
 
-#### Executing Queries
+### 1. Service-Based Architecture
+
+SQL-Bridge uses Core-Utils' service registry to provide database functionality:
 
 ```java
-// Simple query with ResultMapper to map results to objects
-List<Player> players = database.query(
-    "SELECT * FROM players WHERE level > ?",
-    row -> {
-        // Map each row to a Player object
-        Player player = new Player();
-        player.setId(row.getInt("id"));
-        player.setName(row.getString("name"));
-        player.setLevel(row.getInt("level"));
-        return player;
-    },
-    10 // Parameter value for the ? placeholder
-);
-
-// Get a single result
-Optional<Player> playerOpt = database.queryFirst(
-    "SELECT * FROM players WHERE name = ?",
-    row -> {
-        Player player = new Player();
-        player.setId(row.getInt("id"));
-        player.setName(row.getString("name"));
-        player.setLevel(row.getInt("level"));
-        return player;
-    },
-    "PlayerName"
-);
-
-// Process results with a consumer
-database.executeQuery(
-    "SELECT * FROM players", 
-    row -> {
-        // Process each row
-        String name = row.getString("name");
-        int level = row.getInt("level");
-        System.out.println(name + " is level " + level);
-    }
-);
+DatabaseService databaseService = ServiceRegistry.getService(DatabaseService.class);
 ```
 
-#### Executing Updates
+### 2. Database Connections
+
+Each plugin can have its own database or connection:
 
 ```java
-// Insert a new player
-int rowsAffected = database.update(
-    "INSERT INTO players (name, level) VALUES (?, ?)",
-    "NewPlayer", 1
-);
+// Main database for the server
+Database mainDatabase = databaseService.getDatabase();
 
-// Update player level
-database.update(
-    "UPDATE players SET level = ? WHERE name = ?",
-    5, "PlayerName"
-);
+// Database specific to your plugin
+Database pluginDatabase = databaseService.getDatabaseForPlugin(yourPlugin);
 
-// Delete a player
-database.update(
-    "DELETE FROM players WHERE name = ?",
-    "PlayerName"
-);
-```
+// Named database for special purposes
+Database customDatabase = databaseService.getDatabase("custom");
 
-#### Asynchronous Operations
-
-```java
-// Async query
-database.queryAsync(
-    "SELECT * FROM players WHERE level > ?",
-    row -> {
-        Player player = new Player();
-        player.setId(row.getInt("id"));
-        player.setName(row.getString("name"));
-        player.setLevel(row.getInt("level"));
-        return player;
-    },
-    10
-).thenAccept(players -> {
-    // This will run when the query completes
-    System.out.println("Found " + players.size() + " players");
-}).exceptionally(ex -> {
-    // Handle exceptions
-    ex.printStackTrace();
-    return null;
-});
-
-// Async update
-database.updateAsync(
-    "UPDATE players SET level = level + 1 WHERE name = ?",
-    "PlayerName"
-).thenAccept(rowsAffected -> {
-    System.out.println("Updated " + rowsAffected + " rows");
-}).exceptionally(ex -> {
-    ex.printStackTrace();
-    return null;
+// Shared database across a BungeeCord network
+databaseService.getSharedDatabase().ifPresent(sharedDatabase -> {
+    // Use shared database
 });
 ```
 
-### Using Query Builders
+### 3. Execution Patterns
 
-SQL-Bridge provides a fluent API for building SQL queries:
+SQL-Bridge supports multiple execution patterns:
 
-#### Select Builder
+**Synchronous (blocking):**
+```java
+try {
+    List<Player> players = database.query("SELECT * FROM players", playerMapper);
+} catch (SQLException e) {
+    // Handle error
+}
+```
+
+**Asynchronous with CompletableFuture:**
+```java
+database.queryAsync("SELECT * FROM players", playerMapper)
+    .thenAccept(players -> {
+        // Process players
+    })
+    .exceptionally(e -> {
+        // Handle error
+        return null;
+    });
+```
+
+**Asynchronous with Callbacks:**
+```java
+database.queryWithCallback("SELECT * FROM players", playerMapper,
+    new DatabaseResultCallback<List<Player>>() {
+        @Override
+        public void onSuccess(List<Player> players) {
+            // Process players
+        }
+        
+        @Override
+        public void onError(Exception e) {
+            // Handle error
+        }
+    });
+```
+
+**Safe Methods (automatic error handling):**
+```java
+List<Player> players = database.querySafe("SELECT * FROM players", playerMapper, getLogger());
+```
+
+### 4. Builder Pattern
+
+SQL-Bridge uses a fluent builder pattern for constructing queries:
 
 ```java
 List<Player> players = database.select()
@@ -254,177 +298,555 @@ List<Player> players = database.select()
     .where("level > ?", 10)
     .orderBy("level DESC")
     .limit(10)
-    .executeQuery(row -> {
-        Player player = new Player();
-        player.setId(row.getInt("id"));
-        player.setName(row.getString("name"));
-        player.setLevel(row.getInt("level"));
-        return player;
-    });
+    .executeQuery(playerMapper);
 ```
 
-#### Insert Builder
+## API Reference
+
+### DatabaseService
+
+The entry point for all database operations.
+
+#### Key Methods
 
 ```java
-int rowsAffected = database.insertInto("players")
-    .columns("name", "level")
-    .values("NewPlayer", 1)
-    .executeUpdate();
+// Get the main database connection
+Database getDatabase();
 
-// Insert with on duplicate key update
-database.insertInto("players")
-    .columns("name", "level")
-    .values("ExistingPlayer", 5)
-    .onDuplicateKeyUpdate("level", 5)
-    .executeUpdate();
+// Get a database for a specific plugin
+Database getDatabaseForPlugin(Plugin plugin);
 
-// Insert multiple rows
-database.insertInto("players")
-    .columns("name", "level")
-    .values("Player1", 1)
-    .addRow("Player2", 2)
-    .addRow("Player3", 3)
-    .executeUpdate();
+// Get a named database connection
+Database getDatabase(String name);
+
+// Check if a database exists
+boolean databaseExists(String name);
+
+// Get a shared database for BungeeSupport
+Optional<Database> getSharedDatabase();
+
+// Register migrations
+void registerMigrations(Plugin plugin, List<Migration> migrations);
+
+// Run migrations
+int runMigrations(Plugin plugin);
+int runMigrationsSafe(Plugin plugin);
+
+// Run migrations asynchronously
+CompletableFuture<Integer> runMigrationsAsync(Plugin plugin);
+
+// Get current schema version
+int getCurrentSchemaVersion(Plugin plugin);
+
+// Initialize database (convenience method)
+boolean initializeDatabase(Plugin plugin, String... createTableStatements);
+
+// Get statistics
+Map<String, Object> getStatistics();
+
+// Close all connections
+void shutdown();
 ```
 
-#### Update Builder
+### Database
+
+The main interface for executing database operations.
+
+#### Query Methods
 
 ```java
-int rowsAffected = database.update("players")
-    .set("level", 5)
-    .where("name = ?", "PlayerName")
-    .executeUpdate();
+// Basic query methods
+<T> List<T> query(String sql, ResultMapper<T> mapper, Object... params) throws SQLException;
+<T> Optional<T> queryFirst(String sql, ResultMapper<T> mapper, Object... params) throws SQLException;
 
-// Update multiple columns
-Map<String, Object> updates = new HashMap<>();
-updates.put("level", 10);
-updates.put("experience", 500);
+// Asynchronous query methods
+<T> CompletableFuture<List<T>> queryAsync(String sql, ResultMapper<T> mapper, Object... params);
+<T> CompletableFuture<Optional<T>> queryFirstAsync(String sql, ResultMapper<T> mapper, Object... params);
 
-database.update("players")
-    .set(updates)
-    .where("name = ?", "PlayerName")
-    .executeUpdate();
+// Safe query methods (no exceptions)
+<T> List<T> querySafe(String sql, ResultMapper<T> mapper, Logger logger, Object... params);
+<T> Optional<T> queryFirstSafe(String sql, ResultMapper<T> mapper, Logger logger, Object... params);
+
+// Callback-based query methods
+<T> void queryWithCallback(String sql, ResultMapper<T> mapper, DatabaseResultCallback<List<T>> callback, Object... params);
+<T> void queryFirstWithCallback(String sql, ResultMapper<T> mapper, DatabaseResultCallback<Optional<T>> callback, Object... params);
+
+// Execute query with consumer
+void executeQuery(String sql, Consumer<ResultRow> resultConsumer, Object... params) throws SQLException;
+```
+
+#### Update Methods
+
+```java
+// Basic update methods
+int update(String sql, Object... params) throws SQLException;
+
+// Asynchronous update methods
+CompletableFuture<Integer> updateAsync(String sql, Object... params);
+
+// Safe update methods (no exceptions)
+int updateSafe(String sql, Logger logger, Object... params);
+
+// Callback-based update methods
+void updateWithCallback(String sql, DatabaseResultCallback<Integer> callback, Object... params);
+
+// Batch update methods
+int[] batchUpdate(String sql, List<Object[]> parameterSets) throws SQLException;
+CompletableFuture<int[]> batchUpdateAsync(String sql, List<Object[]> parameterSets);
+int[] batchUpdateSafe(String sql, List<Object[]> parameterSets, Logger logger);
+void batchUpdateWithCallback(String sql, List<Object[]> parameterSets, DatabaseResultCallback<int[]> callback);
+```
+
+#### Schema Methods
+
+```java
+// Check if a table exists
+boolean tableExists(String tableName) throws SQLException;
+boolean tableExistsSafe(String tableName, Logger logger);
+
+// Create a table if it doesn't exist
+boolean createTableIfNotExists(String tableName, String createTableSQL) throws SQLException;
+boolean createTableIfNotExistsSafe(String tableName, String createTableSQL, Logger logger);
+```
+
+#### Connection Methods
+
+```java
+// Get a raw JDBC connection
+Connection getConnection() throws SQLException;
+
+// Check if the connection is valid
+boolean isConnectionValid();
+
+// Get database statistics
+Map<String, Object> getStatistics();
+```
+
+#### Query Builder Methods
+
+```java
+// Create query builders
+SelectBuilder select();
+InsertBuilder insertInto(String table);
+UpdateBuilder update(String table);
+DeleteBuilder deleteFrom(String table);
+QueryBuilder createQuery();
+```
+
+#### Transaction Methods
+
+```java
+// Execute a transaction
+<T> T executeTransaction(Transaction<T> transactionFunction) throws SQLException;
+<T> CompletableFuture<T> executeTransactionAsync(Transaction<T> transactionFunction);
+<T> T executeTransactionSafe(Transaction<T> transactionFunction, Logger logger);
+```
+
+### Query Builders
+
+SQL-Bridge provides fluent builders for different query types.
+
+#### SelectBuilder
+
+```java
+SelectBuilder select = database.select();
+select.columns("id", "name", "level") // Select columns
+      .from("players")                // From table
+      .where("level > ?", 10)         // Where clause with parameters
+      .and("guild = ?", "Knights")    // Additional AND condition
+      .or("rank = ?", "Elite")        // Additional OR condition
+      .innerJoin("guilds", "players.guild_id = guilds.id") // Join
+      .groupBy("level")               // Group by
+      .having("COUNT(*) > ?", 5)      // Having clause
+      .orderBy("level DESC")          // Order by
+      .limit(10)                      // Limit results
+      .offset(20)                     // Offset (pagination)
+      .forUpdate();                   // For update lock
+      
+// Execute the query
+List<Player> players = select.executeQuery(playerMapper);
+```
+
+#### InsertBuilder
+
+```java
+InsertBuilder insert = database.insertInto("players");
+insert.columns("name", "level", "experience") // Columns to insert
+      .values("PlayerOne", 1, 0)              // Values for a row
+      .addRow("PlayerTwo", 2, 100)            // Add additional row
+      .onDuplicateKeyUpdate("level", 1)       // On duplicate key update
+      .returning("id");                       // Return generated keys
+      
+// Execute the insert
+int rowsAffected = insert.executeUpdate();
+
+// Insert using a map
+Map<String, Object> playerData = new HashMap<>();
+playerData.put("name", "PlayerThree");
+playerData.put("level", 3);
+playerData.put("experience", 200);
+
+insert.columnValues(playerData)
+      .executeUpdate();
+```
+
+#### UpdateBuilder
+
+```java
+UpdateBuilder update = database.update("players");
+update.set("level", 5)                        // Set a column value
+      .set("experience", 500)                 // Set another column
+      .where("id = ?", 123)                   // Where clause
+      .limit(1);                              // Limit the update
+      
+// Execute the update
+int rowsAffected = update.executeUpdate();
+
+// Update using a map
+Map<String, Object> updateValues = new HashMap<>();
+updateValues.put("level", 6);
+updateValues.put("experience", 600);
+
+update.set(updateValues)
+      .where("name = ?", "PlayerOne")
+      .executeUpdate();
+```
+
+#### DeleteBuilder
+
+```java
+DeleteBuilder delete = database.deleteFrom("players");
+delete.where("level < ?", 5)                  // Where clause
+      .limit(10)                              // Limit the delete
+      .orderBy("last_login ASC");             // Order by (for MySQL)
+      
+// Execute the delete
+int rowsAffected = delete.executeUpdate();
+```
+
+### Result Mapping
+
+#### ResultMapper Interface
+
+```java
+// Define how to map database rows to objects
+ResultMapper<Player> playerMapper = row -> {
+    Player player = new Player();
+    player.setId(row.getInt("id"));
+    player.setName(row.getString("name"));
+    player.setLevel(row.getInt("level"));
+    player.setExperience(row.getInt("experience"));
+    return player;
+};
+
+// Use the mapper in queries
+List<Player> players = database.query("SELECT * FROM players", playerMapper);
+```
+
+#### ResultRow Interface
+
+```java
+// Access data from a database row
+public interface ResultRow {
+    String getString(String columnName) throws SQLException;
+    int getInt(String columnName) throws SQLException;
+    long getLong(String columnName) throws SQLException;
+    double getDouble(String columnName) throws SQLException;
+    boolean getBoolean(String columnName) throws SQLException;
+    byte[] getBytes(String columnName) throws SQLException;
+    java.sql.Date getDate(String columnName) throws SQLException;
+    java.sql.Timestamp getTimestamp(String columnName) throws SQLException;
+    Object getObject(String columnName) throws SQLException;
+    boolean isNull(String columnName) throws SQLException;
+}
 ```
 
 ### Transactions
 
+Transactions allow you to execute multiple operations as a single unit:
+
 ```java
-// Execute operations in a transaction
-boolean success = database.executeTransaction(connection -> {
-    try (PreparedStatement stmt1 = connection.prepareStatement(
-            "INSERT INTO players (name, level) VALUES (?, ?)")) {
-        stmt1.setString(1, "NewPlayer");
-        stmt1.setInt(2, 1);
-        stmt1.executeUpdate();
+// Using transactions with lambda
+int newPlayerId = database.executeTransaction(connection -> {
+    // Insert player
+    try (PreparedStatement stmt = connection.prepareStatement(
+            "INSERT INTO players (name, level) VALUES (?, ?)",
+            Statement.RETURN_GENERATED_KEYS)) {
+        stmt.setString(1, "NewPlayer");
+        stmt.setInt(2, 1);
+        stmt.executeUpdate();
         
-        try (PreparedStatement stmt2 = connection.prepareStatement(
-                "UPDATE statistics SET player_count = player_count + 1")) {
-            stmt2.executeUpdate();
+        // Get generated ID
+        try (ResultSet keys = stmt.getGeneratedKeys()) {
+            if (keys.next()) {
+                int playerId = keys.getInt(1);
+                
+                // Insert initial inventory items
+                try (PreparedStatement itemStmt = connection.prepareStatement(
+                        "INSERT INTO items (player_id, name, quantity) VALUES (?, ?, ?)")) {
+                    // Add starter sword
+                    itemStmt.setInt(1, playerId);
+                    itemStmt.setString(2, "Wooden Sword");
+                    itemStmt.setInt(3, 1);
+                    itemStmt.executeUpdate();
+                    
+                    // Add starter food
+                    itemStmt.setInt(1, playerId);
+                    itemStmt.setString(2, "Apple");
+                    itemStmt.setInt(3, 5);
+                    itemStmt.executeUpdate();
+                }
+                
+                return playerId;
+            }
         }
     }
     
-    return true; // Commit the transaction
+    return -1; // Failed to get player ID
 });
 
-// Async transaction
+// Asynchronous transactions
 database.executeTransactionAsync(connection -> {
-    // Your transaction code here
+    // Transaction code here
     return true;
 }).thenAccept(result -> {
-    System.out.println("Transaction completed with result: " + result);
-}).exceptionally(ex -> {
-    ex.printStackTrace();
-    return null;
+    // Process result
 });
+
+// Safe transactions (no exceptions)
+Boolean result = database.executeTransactionSafe(connection -> {
+    // Transaction code here
+    return true;
+}, getLogger());
 ```
 
-### Batch Operations
+### Migrations
+
+Migrations allow you to manage database schema versions:
 
 ```java
-// Create batch parameters
-List<Object[]> batchParams = new ArrayList<>();
-batchParams.add(new Object[] { "Player1", 10 });
-batchParams.add(new Object[] { "Player2", 15 });
-batchParams.add(new Object[] { "Player3", 20 });
-
-// Execute batch update
-int[] results = database.batchUpdate(
-    "INSERT INTO players (name, level) VALUES (?, ?)",
-    batchParams
-);
-
-// Async batch update
-database.batchUpdateAsync(
-    "INSERT INTO players (name, level) VALUES (?, ?)",
-    batchParams
-).thenAccept(results -> {
-    System.out.println("Batch update completed, inserted " + results.length + " rows");
-});
-```
-
-### Database Migrations
-
-SQL-Bridge provides a migration system to manage database schema versions:
-
-```java
-public class YourPlugin extends JavaPlugin {
-    private DatabaseService databaseService;
-    
+// Create migration classes
+public class CreatePlayersTable implements Migration {
     @Override
-    public void onEnable() {
-        databaseService = ServiceRegistry.getService(DatabaseService.class);
-        
-        // Register migrations
-        List<Migration> migrations = new ArrayList<>();
-        migrations.add(new CreateInitialTables());
-        migrations.add(new AddColumnsMigration());
-        
-        databaseService.registerMigrations(getName(), migrations);
-        
-        // Run migrations
-        databaseService.runMigrationsAsync(getName())
-            .thenAccept(count -> {
-                getLogger().info("Applied " + count + " migrations");
-            });
+    public int getVersion() {
+        return 1; // Migration version number
     }
     
-    // Migration implementation example
-    private static class CreateInitialTables implements Migration {
-        @Override
-        public int getVersion() {
-            return 1;
+    @Override
+    public String getDescription() {
+        return "Create players table";
+    }
+    
+    @Override
+    public void migrate(Connection connection) throws SQLException {
+        try (Statement stmt = connection.createStatement()) {
+            stmt.execute("CREATE TABLE players (" +
+                        "id INT AUTO_INCREMENT PRIMARY KEY, " +
+                        "name VARCHAR(100) NOT NULL, " +
+                        "level INT NOT NULL DEFAULT 1)");
         }
-        
-        @Override
-        public String getDescription() {
-            return "Create initial tables";
-        }
-        
-        @Override
-        public void migrate(Connection connection) throws SQLException {
-            try (Statement stmt = connection.createStatement()) {
-                stmt.execute("CREATE TABLE players (" +
-                             "id INT AUTO_INCREMENT PRIMARY KEY, " +
-                             "name VARCHAR(100) NOT NULL, " +
-                             "level INT NOT NULL DEFAULT 1)");
-            }
-        }
-        
-        @Override
-        public void rollback(Connection connection) throws SQLException {
-            try (Statement stmt = connection.createStatement()) {
-                stmt.execute("DROP TABLE IF EXISTS players");
-            }
+    }
+    
+    @Override
+    public void rollback(Connection connection) throws SQLException {
+        try (Statement stmt = connection.createStatement()) {
+            stmt.execute("DROP TABLE IF EXISTS players");
         }
     }
 }
+
+public class AddExperienceColumn implements Migration {
+    @Override
+    public int getVersion() {
+        return 2; // Next version number
+    }
+    
+    @Override
+    public String getDescription() {
+        return "Add experience column to players table";
+    }
+    
+    @Override
+    public void migrate(Connection connection) throws SQLException {
+        try (Statement stmt = connection.createStatement()) {
+            stmt.execute("ALTER TABLE players " +
+                        "ADD COLUMN experience INT NOT NULL DEFAULT 0");
+        }
+    }
+    
+    @Override
+    public void rollback(Connection connection) throws SQLException {
+        try (Statement stmt = connection.createStatement()) {
+            stmt.execute("ALTER TABLE players DROP COLUMN experience");
+        }
+    }
+}
+
+// Register migrations with SQL-Bridge
+@Override
+public void onEnable() {
+    // ... setup database service
+    
+    // Register migrations
+    List<Migration> migrations = new ArrayList<>();
+    migrations.add(new CreatePlayersTable());
+    migrations.add(new AddExperienceColumn());
+    
+    databaseService.registerMigrations(this, migrations);
+    
+    // Run migrations
+    int appliedCount = databaseService.runMigrationsSafe(this);
+    getLogger().info("Applied " + appliedCount + " migrations");
+}
+```
+
+### Error Handling
+
+SQL-Bridge provides multiple approaches to error handling:
+
+#### 1. Traditional Try-Catch
+
+```java
+try {
+    List<Player> players = database.query("SELECT * FROM players", playerMapper);
+    // Process players
+} catch (SQLException e) {
+    getLogger().severe("Database error: " + e.getMessage());
+    e.printStackTrace();
+}
+```
+
+#### 2. Safe Methods
+
+```java
+// No try-catch needed, errors are logged automatically
+List<Player> players = database.querySafe("SELECT * FROM players", playerMapper, getLogger());
+```
+
+#### 3. Asynchronous Error Handling
+
+```java
+// With CompletableFuture
+database.queryAsync("SELECT * FROM players", playerMapper)
+    .thenAccept(players -> {
+        // Process players
+    })
+    .exceptionally(e -> {
+        getLogger().severe("Async error: " + e.getMessage());
+        return null;
+    });
+
+// With callbacks
+database.queryWithCallback("SELECT * FROM players", playerMapper,
+    new DatabaseResultCallback<List<Player>>() {
+        @Override
+        public void onSuccess(List<Player> players) {
+            // Process players
+        }
+        
+        @Override
+        public void onError(Exception e) {
+            getLogger().severe("Callback error: " + e.getMessage());
+        }
+    });
+```
+
+### Callback Support
+
+SQL-Bridge provides callback interfaces for asynchronous operations:
+
+#### DatabaseCallback
+
+```java
+// For operations without results
+database.updateWithCallback("UPDATE players SET level = level + 1",
+    new DatabaseCallback() {
+        @Override
+        public void onSuccess() {
+            // Operation completed successfully
+        }
+        
+        @Override
+        public void onError(Exception e) {
+            // Handle error
+        }
+    });
+```
+
+#### DatabaseResultCallback
+
+```java
+// For operations with results
+database.queryWithCallback("SELECT * FROM players", playerMapper,
+    new DatabaseResultCallback<List<Player>>() {
+        @Override
+        public void onSuccess(List<Player> players) {
+            // Process players
+        }
+        
+        @Override
+        public void onError(Exception e) {
+            // Handle error
+        }
+    });
 ```
 
 ## Advanced Features
 
-### BungeeSupport and Shared Databases
+### Connection Pooling
 
-If you're running a BungeeCord network, you can enable shared databases:
+SQL-Bridge uses HikariCP for efficient connection pooling. You can configure the connection pool in the `config.yml` file:
+
+```yaml
+database:
+  mysql:
+    pool:
+      maximum-pool-size: 10
+      minimum-idle: 5
+      maximum-lifetime: 1800000
+      connection-timeout: 5000
+```
+
+Consider the following when configuring your connection pool:
+
+- **maximum-pool-size**: Should be proportional to the expected concurrent database operations
+- **minimum-idle**: Keep some connections warm to avoid startup latency
+- **connection-timeout**: How long to wait for a connection before timing out
+- **maximum-lifetime**: How long a connection can exist before being recycled
+
+### Performance Monitoring
+
+SQL-Bridge includes performance monitoring features:
+
+```java
+// Get database statistics
+Map<String, Object> stats = database.getStatistics();
+
+// Log statistics
+getLogger().info("Total queries: " + stats.get("totalQueries"));
+getLogger().info("Average query time: " + stats.get("averageQueryTime") + "ms");
+getLogger().info("Slow queries: " + stats.get("slowQueries"));
+```
+
+You can also enable detailed monitoring in the `config.yml`:
+
+```yaml
+monitoring:
+  enabled: true
+  slow-query-threshold: 1000  # Log queries that take longer than 1 second
+  collect-metrics: true
+  metrics-interval: 300       # Collect metrics every 5 minutes
+```
+
+### BungeeSupport
+
+SQL-Bridge can share a database across a BungeeCord network:
+
+```yaml
+bungee:
+  enabled: true
+  shared-database: true
+```
 
 ```java
 // Check if shared database is available
@@ -434,11 +856,15 @@ databaseService.getSharedDatabase().ifPresent(sharedDb -> {
         sharedDb.update("INSERT INTO global_stats (player, value) VALUES (?, ?)",
                       "PlayerName", 100);
     } catch (SQLException e) {
-        e.printStackTrace();
+        // Handle error
     }
 });
+```
 
-// Or with the BungeeSupport directly
+For more advanced cross-server communication:
+
+```java
+// Access BungeeSupport features
 if (plugin instanceof SqlBridgePlugin) {
     SqlBridgePlugin sqlBridgePlugin = (SqlBridgePlugin) plugin;
     BungeeSupport bungeeSupport = sqlBridgePlugin.getBungeeSupport();
@@ -448,40 +874,239 @@ if (plugin instanceof SqlBridgePlugin) {
         
         // Store a value accessible by all servers
         sharedManager.set("global.player.count", "42")
-            .thenAccept(v -> System.out.println("Value set successfully"));
+            .thenAccept(v -> getLogger().info("Value set successfully"));
+            
+        // Get a value from any server
+        sharedManager.get("global.player.count")
+            .thenAccept(value -> getLogger().info("Player count: " + value));
     }
 }
 ```
 
-### Performance Monitoring
+### Security Features
+
+SQL-Bridge includes security features to prevent SQL injection:
+
+```yaml
+security:
+  sql-injection-detection: true
+  log-dangerous-operations: true
+  max-query-length: 10000
+```
+
+The `QueryValidator` automatically validates all queries for potential SQL injection attempts. Always use parameterized queries:
 
 ```java
-// Get database statistics
-Map<String, Object> stats = databaseService.getStatistics();
+// SAFE: Using parameters (recommended)
+database.update("UPDATE players SET level = ? WHERE name = ?", 5, playerName);
 
-// Log some key metrics
-System.out.println("Total queries: " + stats.get("totalQueries"));
-System.out.println("Average query time: " + stats.get("averageQueryTime") + "ms");
-System.out.println("Slow queries: " + stats.get("slowQueries"));
+// UNSAFE: Building queries with string concatenation (never do this)
+database.update("UPDATE players SET level = 5 WHERE name = '" + playerName + "'");
+```
+
+## Best Practices
+
+### 1. Use Asynchronous Operations
+
+Database operations can be slow. Use asynchronous methods to avoid blocking the main server thread:
+
+```java
+database.queryAsync("SELECT * FROM players", playerMapper)
+    .thenAccept(players -> {
+        // Process players (this will run off the main thread)
+        
+        // If you need to update something on the main thread:
+        Bukkit.getScheduler().runTask(plugin, () -> {
+            // Update UI or game state on the main thread
+        });
+    });
+```
+
+### 2. Use Query Builders
+
+Query builders are safer and more maintainable than raw SQL strings:
+
+```java
+// Better than writing raw SQL
+database.select()
+    .columns("id", "name", "level")
+    .from("players")
+    .where("level > ?", 10)
+    .orderBy("level DESC")
+    .executeQueryAsync(playerMapper)
+    .thenAccept(players -> {
+        // Process players
+    });
+```
+
+### 3. Create Data Access Objects (DAOs)
+
+Encapsulate database operations in dedicated classes:
+
+```java
+public class PlayerDao {
+    private final Database database;
+    private final ResultMapper<Player> playerMapper;
+    
+    public PlayerDao(Database database) {
+        this.database = database;
+        this.playerMapper = row -> {
+            Player player = new Player();
+            player.setId(row.getInt("id"));
+            player.setName(row.getString("name"));
+            player.setLevel(row.getInt("level"));
+            return player;
+        };
+    }
+    
+    // CRUD operations
+    public Optional<Player> findById(int id) throws SQLException {
+        return database.queryFirst(
+            "SELECT * FROM players WHERE id = ?", 
+            playerMapper, 
+            id
+        );
+    }
+    
+    public List<Player> findAll() throws SQLException {
+        return database.query("SELECT * FROM players", playerMapper);
+    }
+    
+    public int createPlayer(String name, int level) throws SQLException {
+        return database.update(
+            "INSERT INTO players (name, level) VALUES (?, ?)",
+            name, level
+        );
+    }
+    
+    // etc.
+}
+```
+
+### 4. Use Migrations for Schema Evolution
+
+Always define migrations for database schema changes:
+
+```java
+// Register migrations on plugin startup
+databaseService.registerMigrations(this, getAllMigrations());
+
+// Then run them
+databaseService.runMigrationsAsync(this)
+    .thenAccept(count -> getLogger().info("Applied " + count + " migrations"));
+```
+
+### 5. Properly Close Resources
+
+SQL-Bridge automatically manages connections, but if you get a raw connection, make sure to close it:
+
+```java
+try (Connection conn = database.getConnection()) {
+    // Use connection
+} // Connection automatically closed here
+```
+
+### 6. Use Safe Methods for Cleaner Code
+
+Safe methods reduce error handling boilerplate:
+
+```java
+// No try-catch needed, much cleaner code
+database.updateSafe(
+    "UPDATE players SET level = ? WHERE name = ?",
+    getLogger(),
+    5, playerName
+);
 ```
 
 ## Troubleshooting
 
 ### Common Issues
 
-1. **Connection Refused**: Check that your database server is running and accessible
-2. **Authentication Failed**: Verify username and password in the configuration
-3. **Table Not Found**: Ensure that your database schema is correctly set up
-4. **Performance Issues**: Check the monitoring dashboard for slow queries
+#### Connection Refused
+
+```
+SQL error executing query: Communications link failure
+```
+
+**Solution**: 
+- Check that your database server is running and accessible
+- Verify the host and port in your config.yml
+- Check firewall settings
+
+#### Authentication Failed
+
+```
+Access denied for user 'username'@'localhost'
+```
+
+**Solution**:
+- Verify username and password in config.yml
+- Check that the user has permissions to access the database
+
+#### Table Not Found
+
+```
+Table 'database.table_name' doesn't exist
+```
+
+**Solution**:
+- Make sure you've created the table
+- Check table name spelling and case sensitivity
+- Run migrations to create necessary tables
+
+#### Performance Issues
+
+```
+Detected slow query (1500ms): SELECT * FROM players WHERE level > 10
+```
+
+**Solution**:
+- Add indexes to columns used in WHERE clauses
+- Optimize your queries to retrieve only needed data
+- Use limits to restrict result sets
 
 ### Enabling Debug Logging
 
-To enable detailed logging for troubleshooting:
+For detailed logging:
 
 1. Set `debug: true` in the configuration
 2. Restart the server
-3. Check the server logs for detailed information
+
+Now you'll see detailed logs in the console and in `plugins/SQL-Bridge/logs/`.
+
+### Testing Database Connectivity
+
+Use the built-in command to test your connection:
+
+```
+/sqlbridge test
+```
+
+This will test if the database connection is working.
+
+## Example Projects
+
+Check out these example projects that demonstrate SQL-Bridge usage:
+
+- [Simple Player Database](https://github.com/example/simple-player-db) - Basic player data storage
+- [Economy Plugin](https://github.com/example/economy-plugin) - Advanced usage with transactions
+- [Multi-Server Stats](https://github.com/example/multi-server-stats) - BungeeSupport example
+
+## Contributing
+
+We welcome contributions! Here's how you can help:
+
+1. Fork the repository
+2. Create a feature branch: `git checkout -b my-feature`
+3. Make your changes
+4. Run tests: `./gradlew test`
+5. Submit a pull request
 
 ## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
+
+---
+
+For more information, issues, or feature requests, please visit the [GitHub repository](https://github.com/yourusername/sql-bridge).

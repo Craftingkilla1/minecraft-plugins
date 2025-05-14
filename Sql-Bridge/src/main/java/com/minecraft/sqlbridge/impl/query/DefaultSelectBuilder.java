@@ -15,19 +15,19 @@ import java.util.stream.Collectors;
  * Default implementation of SelectBuilder.
  */
 public class DefaultSelectBuilder extends AbstractQueryBuilder implements SelectBuilder {
-    
+
     private final Dialect dialect;
     private final List<String> columns;
     private String table;
     private final List<String> whereConditions;
-    private final List<JoinClause> joins;
+    private final List<String> joinClauses;
     private final List<String> groupByColumns;
-    private String havingCondition;
+    private String havingClause;
     private String orderBy;
     private Integer limit;
     private Integer offset;
     private boolean forUpdate;
-    
+
     /**
      * Constructor for DefaultSelectBuilder.
      *
@@ -39,25 +39,23 @@ public class DefaultSelectBuilder extends AbstractQueryBuilder implements Select
         this.dialect = dialect;
         this.columns = new ArrayList<>();
         this.whereConditions = new ArrayList<>();
-        this.joins = new ArrayList<>();
+        this.joinClauses = new ArrayList<>();
         this.groupByColumns = new ArrayList<>();
     }
-    
+
     @Override
     public SelectBuilder columns(String... columns) {
         this.columns.clear();
-        for (String column : columns) {
-            this.columns.add(column);
-        }
+        this.columns.addAll(Arrays.asList(columns));
         return this;
     }
-    
+
     @Override
     public SelectBuilder from(String table) {
         this.table = table;
         return this;
     }
-    
+
     @Override
     public SelectBuilder where(String condition, Object... parameters) {
         whereConditions.clear();
@@ -65,7 +63,7 @@ public class DefaultSelectBuilder extends AbstractQueryBuilder implements Select
         addParameters(parameters);
         return this;
     }
-    
+
     @Override
     public SelectBuilder and(String condition, Object... parameters) {
         if (!whereConditions.isEmpty()) {
@@ -76,7 +74,7 @@ public class DefaultSelectBuilder extends AbstractQueryBuilder implements Select
         }
         return this;
     }
-    
+
     @Override
     public SelectBuilder or(String condition, Object... parameters) {
         if (!whereConditions.isEmpty()) {
@@ -87,93 +85,92 @@ public class DefaultSelectBuilder extends AbstractQueryBuilder implements Select
         }
         return this;
     }
-    
+
     @Override
     public SelectBuilder join(String type, String table, String condition) {
-        joins.add(new JoinClause(type, table, condition));
+        joinClauses.add(type + " JOIN " + dialect.formatTableName(table) + " ON " + condition);
         return this;
     }
-    
+
     @Override
     public SelectBuilder innerJoin(String table, String condition) {
         return join("INNER", table, condition);
     }
-    
+
     @Override
     public SelectBuilder leftJoin(String table, String condition) {
         return join("LEFT", table, condition);
     }
-    
+
     @Override
     public SelectBuilder rightJoin(String table, String condition) {
         return join("RIGHT", table, condition);
     }
-    
+
     @Override
     public SelectBuilder groupBy(String... columns) {
-        groupByColumns.clear();
-        groupByColumns.addAll(Arrays.asList(columns));
+        this.groupByColumns.clear();
+        this.groupByColumns.addAll(Arrays.asList(columns));
         return this;
     }
-    
+
     @Override
     public SelectBuilder having(String condition, Object... parameters) {
-        this.havingCondition = condition;
+        this.havingClause = condition;
         addParameters(parameters);
         return this;
     }
-    
+
     @Override
     public SelectBuilder orderBy(String orderBy) {
         this.orderBy = orderBy;
         return this;
     }
-    
+
     @Override
     public SelectBuilder limit(int limit) {
         this.limit = limit;
         return this;
     }
-    
+
     @Override
     public SelectBuilder offset(int offset) {
         this.offset = offset;
         return this;
     }
-    
+
     @Override
     public SelectBuilder forUpdate() {
         this.forUpdate = true;
         return this;
     }
-    
+
     @Override
     public String getSQL() {
+        if (table == null || table.isEmpty()) {
+            throw new IllegalStateException("SELECT query must specify a table");
+        }
+
         StringBuilder sql = new StringBuilder("SELECT ");
         
         // Columns
         if (columns.isEmpty()) {
             sql.append("*");
         } else {
-            sql.append(String.join(", ", columns));
+            sql.append(columns.stream()
+                    .map(dialect::formatColumnName)
+                    .collect(Collectors.joining(", ")));
         }
         
-        // Table
-        sql.append(" FROM ");
-        if (table != null) {
-            sql.append(dialect.formatTableName(table));
-        } else {
-            sql.append("(SELECT 1) as dummy");
+        // FROM clause
+        sql.append(" FROM ").append(dialect.formatTableName(table));
+        
+        // JOIN clauses
+        if (!joinClauses.isEmpty()) {
+            sql.append(" ").append(String.join(" ", joinClauses));
         }
         
-        // Joins
-        for (JoinClause join : joins) {
-            sql.append(" ").append(join.getType()).append(" JOIN ")
-               .append(dialect.formatTableName(join.getTable()))
-               .append(" ON ").append(join.getCondition());
-        }
-        
-        // Where conditions
+        // WHERE clause
         if (!whereConditions.isEmpty()) {
             sql.append(" WHERE ");
             boolean first = true;
@@ -193,81 +190,33 @@ public class DefaultSelectBuilder extends AbstractQueryBuilder implements Select
             }
         }
         
-        // Group By
+        // GROUP BY clause
         if (!groupByColumns.isEmpty()) {
-            sql.append(" GROUP BY ");
-            sql.append(String.join(", ", groupByColumns));
+            sql.append(" GROUP BY ").append(groupByColumns.stream()
+                    .map(dialect::formatColumnName)
+                    .collect(Collectors.joining(", ")));
         }
         
-        // Having
-        if (havingCondition != null) {
-            sql.append(" HAVING ").append(havingCondition);
+        // HAVING clause
+        if (havingClause != null) {
+            sql.append(" HAVING ").append(havingClause);
         }
         
-        // Order By
+        // ORDER BY clause
         if (orderBy != null) {
             sql.append(" ORDER BY ").append(orderBy);
         }
         
-        // Limit and Offset
+        // LIMIT and OFFSET
         if (limit != null) {
             sql.append(" ").append(dialect.getLimitClause(limit, offset));
         }
         
-        // For Update
+        // FOR UPDATE
         if (forUpdate) {
             sql.append(" FOR UPDATE");
         }
         
         return sql.toString();
-    }
-    
-    /**
-     * Represents a JOIN clause in a SELECT query.
-     */
-    private static class JoinClause {
-        private final String type;
-        private final String table;
-        private final String condition;
-        
-        /**
-         * Constructor for JoinClause.
-         *
-         * @param type The join type (INNER, LEFT, RIGHT, etc.)
-         * @param table The table to join
-         * @param condition The join condition
-         */
-        public JoinClause(String type, String table, String condition) {
-            this.type = type;
-            this.table = table;
-            this.condition = condition;
-        }
-        
-        /**
-         * Get the join type.
-         *
-         * @return The join type
-         */
-        public String getType() {
-            return type;
-        }
-        
-        /**
-         * Get the table to join.
-         *
-         * @return The table name
-         */
-        public String getTable() {
-            return table;
-        }
-        
-        /**
-         * Get the join condition.
-         *
-         * @return The join condition
-         */
-        public String getCondition() {
-            return condition;
-        }
     }
 }

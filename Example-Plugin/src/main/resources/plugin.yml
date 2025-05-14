@@ -1,50 +1,42 @@
-name: ExamplePlugin
+# ./Example-Plugin/src/main/resources/plugin.yml
+name: PlayerStats
 version: '${version}'
-main: com.example.exampleplugin.ExamplePlugin
+main: com.minecraft.example.PlayerStatsPlugin
 api-version: '1.16'
-description: Example plugin demonstrating Core-Utils and SQL-Bridge integration
-authors: [Craftingkilla1]
-website: https://github.com/Craftingkilla1/Example-Plugin
+depend: [CoreUtils, Sql-Bridge]
+description: Example plugin demonstrating CoreUtils and Sql-Bridge functionality
+author: Craftingkilla1
+website: https://github.com/Craftingkilla1/minecraft-plugins
 
-# Dependencies
-depend: [CoreUtils]
-softdepend: [SQLBridge]
-
-# Define commands
 commands:
-  example:
-    description: Example plugin commands
-    usage: /example <help|process|stats|feature|version|db>
-    aliases: [ex]
-    permission: example.use
-  exampledb:
-    description: Example plugin database commands
-    usage: /exampledb <help|player|stat|top|transaction|metrics>
-    aliases: [exdb]
-    permission: example.db
-    
-# Define permissions
+  stats:
+    description: View player statistics
+    usage: /stats [player]
+    aliases: [playerstats, pstats]
+  
+  admin:
+    description: Administrative commands for PlayerStats
+    usage: /admin <reset|modify|maintenance> [options]
+    permission: playerstats.admin
+  
+  leaderboard:
+    description: View server leaderboards
+    usage: /leaderboard [category]
+    aliases: [top, lb]
+
 permissions:
-  example.use:
-    description: Allows use of the example command
-    default: true
-  example.process:
-    description: Allows processing text with the example command
+  playerstats.admin:
+    description: Allows access to administrative commands
     default: op
-    children:
-      example.use: true
-  example.stats:
-    description: Allows viewing service statistics
+  
+  playerstats.view.others:
+    description: Allows viewing other players' statistics
     default: op
-    children:
-      example.use: true
-  example.feature:
-    description: Allows checking or changing feature status
+  
+  playerstats.reset:
+    description: Allows resetting player statistics
     default: op
-    children:
-      example.use: true
-  example.db:
-    description: Allows database operations
+    
+  playerstats.modify:
+    description: Allows modifying player statistics
     default: op
-    children:
-      example.use: true

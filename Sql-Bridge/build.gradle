@@ -2,13 +2,9 @@
 plugins {
     id 'java'
     id 'com.github.johnrengelman.shadow' version '7.1.2'
-    id 'maven-publish'
 }
 
 description = 'Database connectivity for modular plugin architecture'
-
-group = 'com.minecraft'
-version = '1.0.4'
 
 repositories {
     mavenCentral()
@@ -49,17 +45,22 @@ dependencies {
     testImplementation 'org.mockito:mockito-core:5.5.0'
 }
 
+// We're going to disable the standard jar completely
+// This ensures only the shadowJar gets used in the publication
+jar.enabled = false
+
+// Configure the shadow jar with appropriate settings
 shadowJar {
     // Include all runtime dependencies
     configurations = [project.configurations.runtimeClasspath]
     
-    // Relocate packages to avoid conflicts
+    // Don't add a classifier (this makes it the default jar artifact)
+    archiveClassifier.set('')
+    
+    // Relocate dependencies to avoid conflicts
     relocate 'com.zaxxer.hikari', 'com.minecraft.sqlbridge.libs.hikari'
     relocate 'com.mysql', 'com.minecraft.sqlbridge.libs.mysql'
     relocate 'org.slf4j', 'com.minecraft.sqlbridge.libs.slf4j'
-    
-    // Set the output file name
-    archiveFileName = "Sql-Bridge-${version}.jar"
     
     // Merge service files properly (needed for JDBC driver registration)
     mergeServiceFiles()
@@ -70,14 +71,9 @@ tasks.named('compileJava') {
     dependsOn(':Core-Utils:shadowJar')
 }
 
-// Build task should depend on shadowJar
-tasks.named('build') {
+// Set shadowJar as the default jar
+tasks.named('assemble') {
     dependsOn shadowJar
-}
-
-// Always use shadowJar as the default jar
-artifacts {
-    archives shadowJar
 }
 
 test {
@@ -89,16 +85,5 @@ java {
     targetCompatibility = JavaVersion.VERSION_1_8
 }
 
-// Optional: Add specific publication configuration
-publishing {
-    publications {
-        mavenJava(MavenPublication) {
-            // Set correct artifact coordinates
-            groupId = 'com.minecraft'
-            artifactId = 'sql-bridge'
-            
-            // Use shadow jar as the published artifact
-            artifact shadowJar
-        }
-    }
-}
+// Remove any custom publishing configuration
+// Root build.gradle already handles publishing for all subprojects

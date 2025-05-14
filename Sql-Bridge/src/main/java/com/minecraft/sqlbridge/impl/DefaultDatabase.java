@@ -8,12 +8,17 @@ import com.minecraft.sqlbridge.api.query.QueryBuilder;
 import com.minecraft.sqlbridge.api.query.SelectBuilder;
 import com.minecraft.sqlbridge.api.query.InsertBuilder;
 import com.minecraft.sqlbridge.api.query.UpdateBuilder;
+import com.minecraft.sqlbridge.api.query.DeleteBuilder;
 import com.minecraft.sqlbridge.api.result.ResultMapper;
 import com.minecraft.sqlbridge.api.result.ResultRow;
 import com.minecraft.sqlbridge.api.transaction.Transaction;
 import com.minecraft.sqlbridge.error.DatabaseException;
 import com.minecraft.sqlbridge.monitoring.QueryStatistics;
 import com.minecraft.sqlbridge.security.QueryValidator;
+import com.minecraft.sqlbridge.impl.query.DefaultDeleteBuilder;
+import com.minecraft.sqlbridge.dialect.Dialect;
+import com.minecraft.sqlbridge.dialect.MySQLDialect;
+import com.minecraft.sqlbridge.dialect.SQLiteDialect;
 
 import javax.sql.DataSource;
 import java.sql.Connection;
@@ -21,6 +26,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -30,6 +36,7 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.function.Consumer;
 import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * Default implementation of the Database interface.
@@ -41,6 +48,7 @@ public class DefaultDatabase implements Database {
     private final QueryValidator queryValidator;
     private final QueryStatistics queryStatistics;
     private final Executor asyncExecutor;
+    private final Dialect dialect;
 
     /**
      * Constructor for DefaultDatabase.
@@ -60,6 +68,14 @@ public class DefaultDatabase implements Database {
                     thread.setDaemon(true);
                     return thread;
                 });
+                
+        // Determine the dialect based on the configured database type
+        String dbType = plugin.getPluginConfig().getDatabaseType().toLowerCase();
+        if (dbType.equals("mysql")) {
+            this.dialect = new MySQLDialect();
+        } else {
+            this.dialect = new SQLiteDialect();
+        }
     }
 
     @Override
@@ -210,6 +226,11 @@ public class DefaultDatabase implements Database {
     public QueryBuilder createQuery() {
         return new DefaultQueryBuilder(this);
     }
+    
+    @Override
+    public DeleteBuilder deleteFrom(String table) {
+        return new DefaultDeleteBuilder(this, dialect).from(table);
+    }
 
     @Override
     public <T> T executeTransaction(Transaction<T> transactionFunction) throws SQLException {
@@ -313,6 +334,93 @@ public class DefaultDatabase implements Database {
         Map<String, Object> stats = new HashMap<>();
         stats.putAll(queryStatistics.getStatistics());
         return stats;
+    }
+    
+    @Override
+    public <T> List<T> querySafe(String sql, ResultMapper<T> mapper, Logger logger, Object... params) {
+        try {
+            // Use existing implementation
+            return query(sql, mapper, params);
+        } catch (SQLException e) {
+            // Optimized error handling
+            logger.log(Level.SEVERE, "Query failed: " + sql, e);
+            // Use this.plugin.getErrorHandler() to track the error
+            plugin.getErrorHandler().handleQueryError(sql, e);
+            return new ArrayList<>();
+        }
+    }
+    
+    @Override
+    public <T> Optional<T> queryFirstSafe(String sql, ResultMapper<T> mapper, Logger logger, Object... params) {
+        try {
+            return queryFirst(sql, mapper, params);
+        } catch (SQLException e) {
+            logger.log(Level.SEVERE, "Query first failed: " + sql, e);
+            plugin.getErrorHandler().handleQueryError(sql, e);
+            return Optional.empty();
+        }
+    }
+    
+    @Override
+    public int updateSafe(String sql, Logger logger, Object... params) {
+        try {
+            return update(sql, params);
+        } catch (SQLException e) {
+            logger.log(Level.SEVERE, "Update failed: " + sql, e);
+            plugin.getErrorHandler().handleQueryError(sql, e);
+            return 0;
+        }
+    }
+    
+    @Override
+    public int[] batchUpdateSafe(String sql, List<Object[]> parameterSets, Logger logger) {
+        try {
+            return batchUpdate(sql, parameterSets);
+        } catch (SQLException e) {
+            logger.log(Level.SEVERE, "Batch update failed: " + sql, e);
+            plugin.getErrorHandler().handleQueryError(sql, e);
+            return new int[0];
+        }
+    }
+    
+    @Override
+    public boolean tableExists(String tableName) throws SQLException {
+        try (Connection conn = getConnection();
+             ResultSet rs = conn.getMetaData().getTables(null, null, tableName, null)) {
+            return rs.next();
+        }
+    }
+    
+    @Override
+    public boolean tableExistsSafe(String tableName, Logger logger) {
+        try {
+            return tableExists(tableName);
+        } catch (SQLException e) {
+            logger.log(Level.SEVERE, "Error checking if table exists: " + tableName, e);
+            plugin.getErrorHandler().handleQueryError("CHECK TABLE " + tableName, e);
+            return false;
+        }
+    }
+    
+    @Override
+    public boolean createTableIfNotExists(String tableName, String createTableSQL) throws SQLException {
+        if (tableExists(tableName)) {
+            return true;
+        }
+        
+        // Execute the SQL directly as this is a DDL statement
+        return update(createTableSQL, new Object[0]) >= 0;
+    }
+    
+    @Override
+    public boolean createTableIfNotExistsSafe(String tableName, String createTableSQL, Logger logger) {
+        try {
+            return createTableIfNotExists(tableName, createTableSQL);
+        } catch (SQLException e) {
+            logger.log(Level.SEVERE, "Error creating table: " + tableName, e);
+            plugin.getErrorHandler().handleQueryError(createTableSQL, e);
+            return false;
+        }
     }
 
     /**

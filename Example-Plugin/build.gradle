@@ -1,33 +1,48 @@
-description = 'Example plugin demonstrating Core-Utils and SQL-Bridge integration'
+// ./Example-Plugin/build.gradle
+plugins {
+    id 'java'
+    id 'com.github.johnrengelman.shadow'
+}
 
-// Override group for this project if needed
-// group = 'com.example'
-
-// The version is automatically set by the VersioningPlugin
+description = 'Example plugin demonstrating CoreUtils and Sql-Bridge functionality'
 
 dependencies {
-    // Add Core-Utils and SQL-Bridge as project dependencies
+    // Spigot API
+    compileOnly "org.spigotmc:spigot-api:${rootProject.ext.minecraftVersion}"
+    
+    // Core-Utils dependency
     compileOnly project(':Core-Utils')
+    
+    // SQL-Bridge dependency
     compileOnly project(':Sql-Bridge')
     
-    // Add any Example-Plugin specific dependencies here
+    // Lombok for reducing boilerplate
+    compileOnly "org.projectlombok:lombok:${rootProject.ext.lombokVersion}"
+    annotationProcessor "org.projectlombok:lombok:${rootProject.ext.lombokVersion}"
+    
+    // Testing dependencies inherited from root project
+}
+
+// Process plugin.yml on build to insert version
+processResources {
+    expand(
+        'version': project.version,
+        'name': project.name
+    )
+}
+
+// Configure JAR and Shadow JAR
+jar {
+    archiveBaseName.set('PlayerStats')
 }
 
 shadowJar {
-    // Set the output file name with correct naming convention
-    archiveBaseName.set('example-plugin')
+    archiveBaseName.set('PlayerStats')
+    
+    // Relocate dependencies if needed
+    // relocate 'com.example.dependency', 'com.minecraft.example.dependency'
 }
 
-// Optional: Add specific publication configuration if needed
-publishing {
-    publications {
-        mavenJava(MavenPublication) {
-            // Set correct artifact coordinates
-            // Using com.minecraft group to match the other plugins
-            groupId = 'com.minecraft'
-            artifactId = 'example-plugin'
-            
-            // The rest is inherited from the parent build.gradle
-        }
-    }
+build {
+    dependsOn shadowJar
 }

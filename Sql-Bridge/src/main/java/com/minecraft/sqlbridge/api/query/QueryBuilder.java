@@ -9,28 +9,29 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
 /**
- * Interface for building and executing SQL queries.
+ * Interface for building SQL queries.
+ * This is the base interface for all query builders.
  */
 public interface QueryBuilder {
     
     /**
-     * Get the SQL string for this query.
+     * Get the SQL query string.
      *
-     * @return The SQL string
+     * @return The SQL query string
      */
     String getSQL();
     
     /**
-     * Get the query parameters.
+     * Get the parameters for the query.
      *
-     * @return The query parameters as an array
+     * @return An array of parameters for the query
      */
     Object[] getParameters();
     
     /**
-     * Execute this query and map the results.
+     * Execute the query and map the results using the provided mapper.
      *
-     * @param mapper The result mapper
+     * @param mapper The mapper to convert result sets to objects
      * @param <T> The type of objects to return
      * @return A list of mapped objects
      * @throws SQLException If an error occurs during execution
@@ -38,18 +39,18 @@ public interface QueryBuilder {
     <T> List<T> executeQuery(ResultMapper<T> mapper) throws SQLException;
     
     /**
-     * Execute this query asynchronously and map the results.
+     * Execute the query asynchronously and map the results using the provided mapper.
      *
-     * @param mapper The result mapper
+     * @param mapper The mapper to convert result sets to objects
      * @param <T> The type of objects to return
      * @return A CompletableFuture containing a list of mapped objects
      */
     <T> CompletableFuture<List<T>> executeQueryAsync(ResultMapper<T> mapper);
     
     /**
-     * Execute this query and return the first result, if any.
+     * Execute the query and return the first result, if any.
      *
-     * @param mapper The result mapper
+     * @param mapper The mapper to convert result sets to objects
      * @param <T> The type of object to return
      * @return An Optional containing the first result, or empty if no results
      * @throws SQLException If an error occurs during execution
@@ -57,16 +58,16 @@ public interface QueryBuilder {
     <T> Optional<T> executeQueryFirst(ResultMapper<T> mapper) throws SQLException;
     
     /**
-     * Execute this query asynchronously and return the first result, if any.
+     * Execute the query asynchronously and return the first result, if any.
      *
-     * @param mapper The result mapper
+     * @param mapper The mapper to convert result sets to objects
      * @param <T> The type of object to return
      * @return A CompletableFuture containing an Optional with the first result, or empty if no results
      */
     <T> CompletableFuture<Optional<T>> executeQueryFirstAsync(ResultMapper<T> mapper);
     
     /**
-     * Execute this query as an update statement.
+     * Execute the query as an update operation.
      *
      * @return The number of rows affected
      * @throws SQLException If an error occurs during execution
@@ -74,7 +75,7 @@ public interface QueryBuilder {
     int executeUpdate() throws SQLException;
     
     /**
-     * Execute this query asynchronously as an update statement.
+     * Execute the query as an update operation asynchronously.
      *
      * @return A CompletableFuture containing the number of rows affected
      */

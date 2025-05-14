@@ -5,17 +5,27 @@ import com.minecraft.sqlbridge.api.query.QueryBuilder;
 import com.minecraft.sqlbridge.api.query.SelectBuilder;
 import com.minecraft.sqlbridge.api.query.InsertBuilder;
 import com.minecraft.sqlbridge.api.query.UpdateBuilder;
+import com.minecraft.sqlbridge.api.query.DeleteBuilder;
 import com.minecraft.sqlbridge.api.result.ResultMapper;
 import com.minecraft.sqlbridge.api.result.ResultRow;
 import com.minecraft.sqlbridge.api.transaction.Transaction;
+import com.minecraft.sqlbridge.api.callback.DatabaseCallback;
+import com.minecraft.sqlbridge.api.callback.DatabaseResultCallback;
+import com.minecraft.sqlbridge.error.DatabaseException;
 
+import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.sql.PreparedStatement;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * Core interface for database operations.
@@ -129,6 +139,17 @@ public interface Database {
      * @return A new UpdateBuilder instance
      */
     UpdateBuilder update(String table);
+    
+    /**
+     * Create a new DELETE query builder.
+     *
+     * @param table The table to delete from
+     * @return A new DeleteBuilder instance
+     */
+    default DeleteBuilder deleteFrom(String table) {
+        DeleteBuilder builder = (DeleteBuilder) createQuery();
+        return builder.from(table);
+    }
 
     /**
      * Create a new query builder for custom queries.
@@ -188,4 +209,231 @@ public interface Database {
      * @return A map of statistics names to values
      */
     Map<String, Object> getStatistics();
+    
+    /**
+     * Execute a SQL query with safe error handling.
+     * This method catches and logs exceptions, returning an empty list if an error occurs.
+     *
+     * @param sql The SQL query to execute
+     * @param mapper The mapper to convert result sets to objects
+     * @param logger The logger to use for error logging
+     * @param params The query parameters
+     * @param <T> The type of objects to return
+     * @return A list of mapped objects, or an empty list if the query fails
+     */
+    default <T> List<T> querySafe(String sql, ResultMapper<T> mapper, Logger logger, Object... params) {
+        try {
+            return query(sql, mapper, params);
+        } catch (SQLException e) {
+            logger.log(Level.SEVERE, "Query failed: " + sql, e);
+            return Collections.emptyList();
+        }
+    }
+    
+    /**
+     * Execute a SQL query and return the first result with safe error handling.
+     * This method catches and logs exceptions, returning an empty Optional if an error occurs.
+     *
+     * @param sql The SQL query to execute
+     * @param mapper The mapper to convert result sets to objects
+     * @param logger The logger to use for error logging
+     * @param params The query parameters
+     * @param <T> The type of object to return
+     * @return An Optional containing the first result, or empty if no results or an error occurs
+     */
+    default <T> Optional<T> queryFirstSafe(String sql, ResultMapper<T> mapper, Logger logger, Object... params) {
+        try {
+            return queryFirst(sql, mapper, params);
+        } catch (SQLException e) {
+            logger.log(Level.SEVERE, "Query first failed: " + sql, e);
+            return Optional.empty();
+        }
+    }
+    
+    /**
+     * Execute a SQL update query with safe error handling.
+     * This method catches and logs exceptions, returning 0 if an error occurs.
+     *
+     * @param sql The SQL update query to execute
+     * @param logger The logger to use for error logging
+     * @param params The query parameters
+     * @return The number of rows affected, or 0 if the update fails
+     */
+    default int updateSafe(String sql, Logger logger, Object... params) {
+        try {
+            return update(sql, params);
+        } catch (SQLException e) {
+            logger.log(Level.SEVERE, "Update failed: " + sql, e);
+            return 0;
+        }
+    }
+    
+    /**
+     * Execute a batch update with safe error handling.
+     * This method catches and logs exceptions, returning an empty array if an error occurs.
+     *
+     * @param sql The SQL update query to execute
+     * @param parameterSets The list of parameter sets, one for each batch execution
+     * @param logger The logger to use for error logging
+     * @return An array containing the number of rows affected by each batch execution, or an empty array if the batch update fails
+     */
+    default int[] batchUpdateSafe(String sql, List<Object[]> parameterSets, Logger logger) {
+        try {
+            return batchUpdate(sql, parameterSets);
+        } catch (SQLException e) {
+            logger.log(Level.SEVERE, "Batch update failed: " + sql, e);
+            return new int[0];
+        }
+    }
+    
+    /**
+     * Execute a SQL query with a callback for asynchronous operation.
+     *
+     * @param sql The SQL query to execute
+     * @param mapper The mapper to convert results to objects
+     * @param callback The callback to handle the results
+     * @param params The query parameters
+     * @param <T> The type of objects to return
+     */
+    default <T> void queryWithCallback(String sql, ResultMapper<T> mapper, 
+                                  DatabaseResultCallback<List<T>> callback, Object... params) {
+        queryAsync(sql, mapper, params)
+            .thenAccept(callback::onSuccess)
+            .exceptionally(e -> {
+                callback.onError(new DatabaseException("Query failed", e));
+                return null;
+            });
+    }
+    
+    /**
+     * Execute a SQL query and return the first result with a callback for asynchronous operation.
+     *
+     * @param sql The SQL query to execute
+     * @param mapper The mapper to convert results to objects
+     * @param callback The callback to handle the result
+     * @param params The query parameters
+     * @param <T> The type of object to return
+     */
+    default <T> void queryFirstWithCallback(String sql, ResultMapper<T> mapper, 
+                                      DatabaseResultCallback<Optional<T>> callback, Object... params) {
+        queryFirstAsync(sql, mapper, params)
+            .thenAccept(callback::onSuccess)
+            .exceptionally(e -> {
+                callback.onError(new DatabaseException("Query first failed", e));
+                return null;
+            });
+    }
+    
+    /**
+     * Execute a SQL update query with a callback for asynchronous operation.
+     *
+     * @param sql The SQL update query to execute
+     * @param callback The callback to handle the result
+     * @param params The query parameters
+     */
+    default void updateWithCallback(String sql, DatabaseResultCallback<Integer> callback, Object... params) {
+        updateAsync(sql, params)
+            .thenAccept(callback::onSuccess)
+            .exceptionally(e -> {
+                callback.onError(new DatabaseException("Update failed", e));
+                return null;
+            });
+    }
+    
+    /**
+     * Execute a batch update with a callback for asynchronous operation.
+     *
+     * @param sql The SQL update query to execute
+     * @param parameterSets The list of parameter sets, one for each batch execution
+     * @param callback The callback to handle the result
+     */
+    default void batchUpdateWithCallback(String sql, List<Object[]> parameterSets, 
+                                    DatabaseResultCallback<int[]> callback) {
+        batchUpdateAsync(sql, parameterSets)
+            .thenAccept(callback::onSuccess)
+            .exceptionally(e -> {
+                callback.onError(new DatabaseException("Batch update failed", e));
+                return null;
+            });
+    }
+    
+    /**
+     * Check if a table exists in the database.
+     *
+     * @param tableName The name of the table to check
+     * @return true if the table exists, false otherwise
+     * @throws SQLException If an error occurs during execution
+     */
+    default boolean tableExists(String tableName) throws SQLException {
+        try (Connection conn = getConnection()) {
+            return conn.getMetaData().getTables(null, null, tableName, null).next();
+        }
+    }
+    
+    /**
+     * Check if a table exists in the database with safe error handling.
+     *
+     * @param tableName The name of the table to check
+     * @param logger The logger to use for error logging
+     * @return true if the table exists, false otherwise
+     */
+    default boolean tableExistsSafe(String tableName, Logger logger) {
+        try {
+            return tableExists(tableName);
+        } catch (SQLException e) {
+            logger.log(Level.SEVERE, "Error checking if table exists: " + tableName, e);
+            return false;
+        }
+    }
+    
+    /**
+     * Create a table if it doesn't exist.
+     *
+     * @param tableName The name of the table
+     * @param createTableSQL The SQL statement to create the table
+     * @return true if the table exists or was created successfully, false otherwise
+     * @throws SQLException If an error occurs during execution
+     */
+    default boolean createTableIfNotExists(String tableName, String createTableSQL) throws SQLException {
+        if (tableExists(tableName)) {
+            return true;
+        }
+        
+        // Execute the SQL directly as this is a DDL statement
+        return update(createTableSQL, new Object[0]) >= 0;
+    }
+    
+    /**
+     * Create a table if it doesn't exist with safe error handling.
+     *
+     * @param tableName The name of the table
+     * @param createTableSQL The SQL statement to create the table
+     * @param logger The logger to use for error logging
+     * @return true if the table exists or was created successfully, false otherwise
+     */
+    default boolean createTableIfNotExistsSafe(String tableName, String createTableSQL, Logger logger) {
+        try {
+            return createTableIfNotExists(tableName, createTableSQL);
+        } catch (SQLException e) {
+            logger.log(Level.SEVERE, "Error creating table: " + tableName, e);
+            return false;
+        }
+    }
+    
+    /**
+     * Execute a transaction safely with error handling.
+     *
+     * @param transactionFunction The function to execute within the transaction
+     * @param logger The logger to use for error logging
+     * @param <T> The type of result returned by the transaction
+     * @return The result of the transaction, or null if the transaction fails
+     */
+    default <T> T executeTransactionSafe(Transaction<T> transactionFunction, Logger logger) {
+        try {
+            return executeTransaction(transactionFunction);
+        } catch (SQLException e) {
+            logger.log(Level.SEVERE, "Transaction failed", e);
+            return null;
+        }
+    }
 }

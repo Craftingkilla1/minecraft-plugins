@@ -9,7 +9,7 @@ import java.util.Map;
 public interface InsertBuilder extends QueryBuilder {
     
     /**
-     * Specify the columns for the INSERT statement.
+     * Specify the columns for the INSERT query.
      *
      * @param columns The column names
      * @return This InsertBuilder for chaining
@@ -17,7 +17,7 @@ public interface InsertBuilder extends QueryBuilder {
     InsertBuilder columns(String... columns);
     
     /**
-     * Specify the values for the INSERT statement.
+     * Specify the values for the INSERT query.
      *
      * @param values The values to insert
      * @return This InsertBuilder for chaining
@@ -25,15 +25,15 @@ public interface InsertBuilder extends QueryBuilder {
     InsertBuilder values(Object... values);
     
     /**
-     * Add a row of values for a multi-row INSERT statement.
+     * Add another row of values for a multi-row INSERT.
      *
-     * @param values The values for the row
+     * @param values The values for the additional row
      * @return This InsertBuilder for chaining
      */
     InsertBuilder addRow(Object... values);
     
     /**
-     * Specify column-value pairs for the INSERT statement.
+     * Specify column-value pairs for the INSERT query.
      *
      * @param columnValues A map of column names to values
      * @return This InsertBuilder for chaining
@@ -41,26 +41,26 @@ public interface InsertBuilder extends QueryBuilder {
     InsertBuilder columnValues(Map<String, Object> columnValues);
     
     /**
-     * Add an ON DUPLICATE KEY UPDATE clause to the query.
+     * Add ON DUPLICATE KEY UPDATE clause for MySQL.
      *
      * @param column The column to update
-     * @param value The value to set
+     * @param value The new value
      * @return This InsertBuilder for chaining
      */
     InsertBuilder onDuplicateKeyUpdate(String column, Object value);
     
     /**
-     * Add multiple ON DUPLICATE KEY UPDATE clauses to the query.
+     * Add ON DUPLICATE KEY UPDATE clause for MySQL with multiple columns.
      *
-     * @param columnValues A map of column names to values
+     * @param columnValues A map of column names to new values
      * @return This InsertBuilder for chaining
      */
     InsertBuilder onDuplicateKeyUpdate(Map<String, Object> columnValues);
     
     /**
-     * Use a SELECT statement as the source of values.
+     * Use a SELECT query as the source for an INSERT.
      *
-     * @param selectBuilder The SelectBuilder for the SELECT statement
+     * @param selectBuilder The SELECT query builder
      * @return This InsertBuilder for chaining
      */
     InsertBuilder select(SelectBuilder selectBuilder);
@@ -72,4 +72,19 @@ public interface InsertBuilder extends QueryBuilder {
      * @return This InsertBuilder for chaining
      */
     InsertBuilder returning(String... columns);
+    
+    /**
+     * Execute the INSERT query and return the number of affected rows with safe error handling.
+     *
+     * @param logger The logger to use for error logging
+     * @return The number of rows inserted, or 0 if the insertion fails
+     */
+    default int executeUpdateSafe(java.util.logging.Logger logger) {
+        try {
+            return executeUpdate();
+        } catch (java.sql.SQLException e) {
+            logger.log(java.util.logging.Level.SEVERE, "Insert failed: " + getSQL(), e);
+            return 0;
+        }
+    }
 }

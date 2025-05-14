@@ -1,21 +1,18 @@
 // ./Sql-Bridge/src/main/java/com/minecraft/sqlbridge/dialect/SQLiteDialect.java
 package com.minecraft.sqlbridge.dialect;
 
-import java.util.Arrays;
-import java.util.HashSet;
+import java.util.EnumSet;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 /**
- * SQLite database dialect implementation.
+ * SQLite dialect implementation.
  */
 public class SQLiteDialect implements Dialect {
     
-    private static final Set<DialectFeature> SUPPORTED_FEATURES = new HashSet<>(Arrays.asList(
-        DialectFeature.DROP_IF_EXISTS,
-        DialectFeature.LIMIT_OFFSET,
-        DialectFeature.FOREIGN_KEYS
-    ));
+    private static final Set<DialectFeature> SUPPORTED_FEATURES = EnumSet.of(
+            DialectFeature.BATCH_OPERATIONS,
+            DialectFeature.RETURNING_CLAUSE
+    );
     
     @Override
     public String getDatabaseType() {
@@ -23,92 +20,44 @@ public class SQLiteDialect implements Dialect {
     }
     
     @Override
-    public boolean supportsFeature(DialectFeature feature) {
-        return SUPPORTED_FEATURES.contains(feature);
-    }
-    
-    @Override
     public String formatTableName(String tableName) {
-        // SQLite uses double quotes for table names
+        // SQLite doesn't require quotes for standard table names,
+        // but for consistency and to handle names with spaces or special chars,
+        // we'll use double quotes
         return "\"" + tableName + "\"";
     }
     
     @Override
     public String formatColumnName(String columnName) {
-        // SQLite uses double quotes for column names
+        // SQLite doesn't require quotes for standard column names,
+        // but for consistency and to handle names with spaces or special chars,
+        // we'll use double quotes
         return "\"" + columnName + "\"";
     }
     
     @Override
-    public String getLimitClause(int limit, Integer offset) {
-        if (offset != null) {
-            return "LIMIT " + limit + " OFFSET " + offset;
-        } else {
-            return "LIMIT " + limit;
+    public String getReturningClause(String columns) {
+        // SQLite supports RETURNING since version 3.35.0 (2021-03-12)
+        return "RETURNING " + columns;
+    }
+    
+    @Override
+    public String getLimitClause(Integer limit, Integer offset) {
+        if (limit == null) {
+            return "";
         }
-    }
-    
-    @Override
-    public String getCreateDatabaseSQL(String databaseName) {
-        // SQLite doesn't have a CREATE DATABASE command
-        // Databases are created by connecting to a file
-        return "";
-    }
-    
-    @Override
-    public String getCreateTableWithAutoIncrementSQL(String tableName, String primaryKeyColumn) {
-        return "CREATE TABLE IF NOT EXISTS " + formatTableName(tableName) + " (" +
-               formatColumnName(primaryKeyColumn) + " INTEGER PRIMARY KEY AUTOINCREMENT)";
-    }
-    
-    @Override
-    public String getPaginationSQL(String innerQuery, int page, int pageSize) {
-        int offset = (page - 1) * pageSize;
-        return innerQuery + " LIMIT " + pageSize + " OFFSET " + offset;
-    }
-    
-    @Override
-    public String getCaseInsensitiveLikeSQL(String column, String pattern) {
-        return column + " LIKE " + pattern + " COLLATE NOCASE";
-    }
-    
-    @Override
-    public String getParameterPlaceholder(int index) {
-        return "?";
-    }
-    
-    @Override
-    public String getCurrentTimestampSQL() {
-        return "CURRENT_TIMESTAMP";
-    }
-    
-    @Override
-    public String getRandomOrderSQL() {
-        return "RANDOM()";
-    }
-    
-    @Override
-    public String getIfExistsSQL() {
-        return "IF EXISTS";
-    }
-    
-    @Override
-    public String getBatchInsertSQL(String tableName, String[] columns, int batchSize) {
-        // SQLite doesn't support multi-row INSERT syntax
-        // We'll create a single-row insert statement that can be executed multiple times
-        String columnList = Arrays.stream(columns)
-                                 .map(this::formatColumnName)
-                                 .collect(Collectors.joining(", "));
         
-        return "INSERT INTO " + formatTableName(tableName) + 
-               " (" + columnList + ") VALUES (" + 
-               Arrays.stream(columns).map(c -> "?").collect(Collectors.joining(", ")) + 
-               ")";
+        StringBuilder clause = new StringBuilder("LIMIT " + limit);
+        
+        if (offset != null && offset > 0) {
+            clause.append(" OFFSET ").append(offset);
+        }
+        
+        return clause.toString();
     }
     
     @Override
-    public String getReturningClause(String columnName) {
-        // SQLite doesn't support RETURNING clause
-        return null;
+    public boolean supportsFeature(DialectFeature feature) {
+        return SUPPORTED_FEATURES.contains(feature);
     }
 }

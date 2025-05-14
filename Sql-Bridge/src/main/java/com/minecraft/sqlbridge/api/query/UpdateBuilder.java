@@ -9,18 +9,18 @@ import java.util.Map;
 public interface UpdateBuilder extends QueryBuilder {
     
     /**
-     * Set a column to a value.
+     * Set a value for a column in the UPDATE query.
      *
-     * @param column The column to set
-     * @param value The value to set
+     * @param column The column name
+     * @param value The new value
      * @return This UpdateBuilder for chaining
      */
     UpdateBuilder set(String column, Object value);
     
     /**
-     * Set multiple columns to values.
+     * Set values for multiple columns in the UPDATE query.
      *
-     * @param columnValues A map of column names to values
+     * @param columnValues A map of column names to new values
      * @return This UpdateBuilder for chaining
      */
     UpdateBuilder set(Map<String, Object> columnValues);
@@ -75,4 +75,19 @@ public interface UpdateBuilder extends QueryBuilder {
      * @return This UpdateBuilder for chaining
      */
     UpdateBuilder returning(String... columns);
+    
+    /**
+     * Execute the UPDATE query and return the number of affected rows with safe error handling.
+     *
+     * @param logger The logger to use for error logging
+     * @return The number of rows updated, or 0 if the update fails
+     */
+    default int executeUpdateSafe(java.util.logging.Logger logger) {
+        try {
+            return executeUpdate();
+        } catch (java.sql.SQLException e) {
+            logger.log(java.util.logging.Level.SEVERE, "Update failed: " + getSQL(), e);
+            return 0;
+        }
+    }
 }

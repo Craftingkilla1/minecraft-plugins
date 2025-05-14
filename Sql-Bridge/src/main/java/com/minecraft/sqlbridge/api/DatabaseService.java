@@ -3,9 +3,13 @@ package com.minecraft.sqlbridge.api;
 
 import com.minecraft.sqlbridge.migration.Migration;
 
+import org.bukkit.plugin.Plugin;
+
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * Service interface for database operations.
@@ -40,6 +44,16 @@ public interface DatabaseService {
     Database getDatabaseForPlugin(String pluginName);
     
     /**
+     * Get a database connection for a specific plugin.
+     *
+     * @param plugin The plugin instance
+     * @return The Database interface for the plugin's database
+     */
+    default Database getDatabaseForPlugin(Plugin plugin) {
+        return getDatabaseForPlugin(plugin.getName());
+    }
+    
+    /**
      * Get a shared database connection for use across a BungeeCord network.
      * This is only available if BungeeSupport is enabled.
      *
@@ -65,12 +79,32 @@ public interface DatabaseService {
     void registerMigrations(String pluginName, List<Migration> migrations);
     
     /**
+     * Register migrations for a plugin.
+     *
+     * @param plugin The plugin instance
+     * @param migrations The list of migrations to register
+     */
+    default void registerMigrations(Plugin plugin, List<Migration> migrations) {
+        registerMigrations(plugin.getName(), migrations);
+    }
+    
+    /**
      * Run all pending migrations for a plugin.
      *
      * @param pluginName The name of the plugin
      * @return The number of migrations that were applied
      */
     int runMigrations(String pluginName);
+    
+    /**
+     * Run all pending migrations for a plugin.
+     *
+     * @param plugin The plugin instance
+     * @return The number of migrations that were applied
+     */
+    default int runMigrations(Plugin plugin) {
+        return runMigrations(plugin.getName());
+    }
     
     /**
      * Run all pending migrations for a plugin asynchronously.
@@ -81,12 +115,94 @@ public interface DatabaseService {
     CompletableFuture<Integer> runMigrationsAsync(String pluginName);
     
     /**
+     * Run all pending migrations for a plugin asynchronously.
+     *
+     * @param plugin The plugin instance
+     * @return A CompletableFuture containing the number of migrations that were applied
+     */
+    default CompletableFuture<Integer> runMigrationsAsync(Plugin plugin) {
+        return runMigrationsAsync(plugin.getName());
+    }
+    
+    /**
+     * Run all pending migrations for a plugin with safe error handling.
+     *
+     * @param pluginName The name of the plugin
+     * @param logger The logger to use for error logging
+     * @return The number of migrations that were applied, or 0 if migrations fail
+     */
+    default int runMigrationsSafe(String pluginName, Logger logger) {
+        try {
+            return runMigrations(pluginName);
+        } catch (Exception e) {
+            logger.log(Level.SEVERE, "Failed to run migrations for plugin '" + pluginName + "'", e);
+            return 0;
+        }
+    }
+    
+    /**
+     * Run all pending migrations for a plugin with safe error handling.
+     *
+     * @param plugin The plugin instance
+     * @return The number of migrations that were applied, or 0 if migrations fail
+     */
+    default int runMigrationsSafe(Plugin plugin) {
+        return runMigrationsSafe(plugin.getName(), plugin.getLogger());
+    }
+    
+    /**
      * Get the current schema version for a plugin.
      *
      * @param pluginName The name of the plugin
      * @return The current schema version
      */
     int getCurrentSchemaVersion(String pluginName);
+    
+    /**
+     * Get the current schema version for a plugin.
+     *
+     * @param plugin The plugin instance
+     * @return The current schema version
+     */
+    default int getCurrentSchemaVersion(Plugin plugin) {
+        return getCurrentSchemaVersion(plugin.getName());
+    }
+    
+    /**
+     * Initialize the database for a plugin. This creates the necessary tables
+     * and runs migrations if needed. This is a convenience method for standard setup.
+     *
+     * @param plugin The plugin instance
+     * @param createTableStatements SQL statements to create tables if they don't exist
+     * @return true if the database was initialized successfully, false otherwise
+     */
+    default boolean initializeDatabase(Plugin plugin, String... createTableStatements) {
+        try {
+            // Get database for this plugin
+            Database db = getDatabaseForPlugin(plugin);
+            
+            // Create tables
+            boolean success = true;
+            for (String sql : createTableStatements) {
+                try {
+                    db.update(sql);
+                } catch (Exception e) {
+                    plugin.getLogger().log(Level.SEVERE, "Failed to execute: " + sql, e);
+                    success = false;
+                }
+            }
+            
+            // Run migrations if any are registered
+            if (getCurrentSchemaVersion(plugin) >= 0 || runMigrationsSafe(plugin) > 0) {
+                plugin.getLogger().info("Database schema is up to date.");
+            }
+            
+            return success;
+        } catch (Exception e) {
+            plugin.getLogger().log(Level.SEVERE, "Failed to initialize database", e);
+            return false;
+        }
+    }
     
     /**
      * Get database statistics.

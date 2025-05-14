@@ -1,30 +1,113 @@
-# ExamplePlugin Configuration
-# This is an example configuration file
+# ./Example-Plugin/src/main/resources/config.yml
+# PlayerStats Configuration
 
-# Debug mode
-# Set to true to enable debug logging
+# Debug mode - enables additional logging
 debug: false
 
-# Features configuration
-# Enable or disable features
+# Features
 features:
-  example_feature_1: true
-  example_feature_2: false
-  example_feature_3: true
-  database_integration: true
+  # Auto-track player statistics
+  auto-track-stats: true
+  
+  # Display notifications for achievements
+  display-notifications: true
+  
+  # Show welcome message on join
+  welcome-message: true
+  
+  # Show stats notification on join
+  join-stats: true
 
-# Database settings
-# These settings are used for SQL-Bridge integration
-database:
-  # Whether to create tables automatically
-  auto-create-tables: true
+# Achievement settings
+achievements:
+  # Check interval in seconds
+  check-interval: 20
   
-  # Table prefix for this plugin
-  table-prefix: 'example_'
+  # Broadcast achievements to all players
+  broadcast: true
   
-  # Performance settings
-  cache-enabled: true
-  cache-size: 100
+  # Achievement rewards
+  rewards:
+    # Enable rewards
+    enabled: true
+    
+    # Default rewards for all achievements
+    default:
+      - "give {player} experience 100"
+    
+    # Specific rewards for achievements
+    list:
+      master_miner:
+        - "give {player} diamond 5"
+        - "give {player} experience 500"
+      combat_expert:
+        - "give {player} enchanted_book 1"
+        - "give {player} experience 500"
+
+# Leaderboard settings
+leaderboards:
+  # Update interval in minutes
+  update-interval: 30
   
-  # Maximum query time warning (milliseconds)
-  slow-query-threshold: 1000
+  # Default leaderboards
+  default:
+    blocks_broken:
+      display-name: "Blocks Broken"
+      stat-name: "blocks.broken"
+      icon: "IRON_PICKAXE"
+      category: "blocks"
+    
+    combat_kills:
+      display-name: "Total Kills"
+      stat-name: "combat.kills"
+      icon: "DIAMOND_SWORD"
+      category: "combat"
+    
+    playtime:
+      display-name: "Playtime"
+      stat-name: "sessions.playtime"
+      icon: "CLOCK"
+      category: "general"
+
+# Performance settings
+performance:
+  # Cache expiry time in minutes
+  cache-expiry-time: 10
+  
+  # Cache flush interval in seconds
+  cache-flush-interval: 5
+  
+  # Batch size for stat updates
+  stat-batch-size: 10
+  
+  # Batch interval in seconds
+  stat-batch-interval: 20
+  
+  # Auto-save stats immediately
+  auto-save-stats: false
+  
+  # Process stats immediately
+  immediate-stats: false
+
+# Stat display names
+stats:
+  display-names:
+    "blocks.broken": "Blocks Broken"
+    "blocks.placed": "Blocks Placed"
+    "combat.kills": "Kills"
+    "combat.deaths": "Deaths"
+    "combat.player_kills": "Player Kills"
+    "combat.damage_dealt": "Damage Dealt"
+    "combat.damage_taken": "Damage Taken"
+    "items.crafted": "Items Crafted"
+    "items.consumed": "Items Consumed"
+    "items.food_eaten": "Food Eaten"
+    "items.potions_drunk": "Potions Drunk"
+    "movement.distance": "Distance Traveled"
+    "movement.walking": "Distance Walked"
+    "movement.swimming": "Distance Swam"
+    "movement.flying": "Distance Flown"
+    "movement.gliding": "Distance Glided"
+    "sessions.count": "Sessions"
+    "sessions.playtime": "Playtime"
+    "fishing.caught": "Fish Caught"

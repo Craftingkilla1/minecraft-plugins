@@ -5,6 +5,7 @@
 2. [Getting Started](#getting-started)
    - [Project Setup](#project-setup)
    - [Adding Core-Utils as a Dependency](#adding-core-utils-as-a-dependency)
+   - [Quick Start with CoreAPI](#quick-start-with-coreapi)
 3. [Service Registry System](#service-registry-system)
    - [Creating a Service](#creating-a-service)
    - [Registering a Service](#registering-a-service)
@@ -127,6 +128,40 @@ api-version: '1.16'
 depend: [CoreUtils]
 ```
 
+### Quick Start with CoreAPI
+
+CoreAPI is a centralized access point for all Core-Utils features. It makes it easy to use the framework in your plugins:
+
+```java
+import com.minecraft.core.api.CoreAPI;
+import org.bukkit.plugin.java.JavaPlugin;
+
+public class YourPlugin extends JavaPlugin {
+    
+    @Override
+    public void onEnable() {
+        // Initialize logging
+        CoreAPI.Utils.initLogging(this);
+        
+        // Register commands
+        CoreAPI.Commands.register(new YourCommand());
+        
+        // Register a service
+        CoreAPI.Services.register(YourService.class, new YourServiceImpl());
+        
+        getLogger().info("Your plugin enabled successfully!");
+    }
+    
+    @Override
+    public void onDisable() {
+        // Unregister services
+        CoreAPI.Services.unregister(YourService.class);
+        
+        getLogger().info("Your plugin disabled successfully!");
+    }
+}
+```
+
 ## Service Registry System
 
 The Service Registry allows plugins to register and consume services from each other, creating a modular architecture.
@@ -171,7 +206,17 @@ public class DefaultYourService implements YourService {
 
 ### Registering a Service
 
-In your plugin's `onEnable()` method:
+Using CoreAPI (recommended):
+
+```java
+// Create the service implementation
+YourService service = new DefaultYourService(this);
+
+// Register the service with the registry
+CoreAPI.Services.register(YourService.class, service);
+```
+
+Using ServiceRegistry directly:
 
 ```java
 import com.minecraft.core.api.service.ServiceRegistry;
@@ -190,7 +235,27 @@ public void onEnable() {
 
 ### Consuming a Service
 
-To use a service from another plugin:
+Using CoreAPI (recommended):
+
+```java
+// Option 1: Get service, check if it exists
+YourService service = CoreAPI.Services.get(YourService.class);
+if (service != null) {
+    // Use the service
+    String result = service.performTask("hello");
+}
+
+// Option 2: Require service (throws exception if not found)
+try {
+    YourService service = CoreAPI.Services.require(YourService.class);
+    // Use the service
+    String result = service.performTask("hello");
+} catch (ServiceLocator.ServiceNotFoundException e) {
+    getLogger().warning("Required service not found: " + e.getMessage());
+}
+```
+
+Using ServiceLocator directly:
 
 ```java
 import com.minecraft.core.api.service.ServiceLocator;
@@ -221,7 +286,7 @@ Services should be registered during your plugin's `onEnable()` method and unreg
 @Override
 public void onDisable() {
     // Unregister the service
-    ServiceRegistry.unregister(YourService.class);
+    CoreAPI.Services.unregister(YourService.class);
     
     // Other cleanup...
 }
@@ -309,7 +374,17 @@ public class YourCommand implements TabCompletionProvider {
 
 ### Registering Commands
 
-Register your command in your plugin's `onEnable()` method:
+With CoreAPI (recommended):
+
+```java
+// Create your command
+YourCommand yourCommand = new YourCommand(this);
+
+// Register your command
+CoreAPI.Commands.register(yourCommand);
+```
+
+With CommandRegistry directly:
 
 ```java
 import com.minecraft.core.CorePlugin;
@@ -345,7 +420,10 @@ Core-Utils provides tools for managing plugin configurations.
 ```java
 import com.minecraft.core.config.ConfigManager;
 
-// Create a config manager for your plugin
+// Option 1: Using CoreAPI
+ConfigManager configManager = CoreAPI.getConfigManager();
+
+// Option 2: Create a config manager for your plugin
 ConfigManager configManager = new ConfigManager(yourPlugin);
 
 // Load the main config
@@ -365,7 +443,10 @@ boolean enabled = config.getBoolean("feature.enabled", false);
 ```java
 import com.minecraft.core.config.Messages;
 
-// Create a messages instance
+// Option 1: Using CoreAPI
+Messages messages = CoreAPI.getMessages();
+
+// Option 2: Create a messages instance
 Messages messages = configManager.createMessages();
 
 // Send messages to players
@@ -456,6 +537,19 @@ InventoryUtil.fillEmptySlots(inventory,
 // Create a border
 InventoryUtil.createBorder(inventory, 54, 
     InventoryUtil.createDivider(Material.GRAY_STAINED_GLASS_PANE));
+
+// Create a confirmation menu
+Inventory confirmMenu = InventoryUtil.createConfirmationMenu(
+    "Confirm Purchase",
+    player -> {
+        // Action when Yes is clicked
+        player.sendMessage("Purchase confirmed!");
+    },
+    player -> {
+        // Action when No is clicked
+        player.sendMessage("Purchase cancelled!");
+    }
+);
 ```
 
 ### FormatUtil
@@ -505,7 +599,17 @@ bungeeUtils.getPlayerCount("survival", count -> {
 
 ## Best Practices
 
-1. **Check for Core-Utils**: Always verify that Core-Utils is available before using its features.
+1. **Use CoreAPI**: Always use the CoreAPI class for accessing Core-Utils features. It provides a clean, centralized interface.
+
+```java
+// Instead of this:
+ServiceRegistry.register(YourService.class, yourService);
+
+// Use this:
+CoreAPI.Services.register(YourService.class, yourService);
+```
+
+2. **Check for Core-Utils**: Always verify that Core-Utils is available before using its features.
 
 ```java
 private boolean checkCoreUtils() {
@@ -519,10 +623,10 @@ private boolean checkCoreUtils() {
 }
 ```
 
-2. **Handle Missing Services**: Gracefully handle situations where a service isn't available.
+3. **Handle Missing Services**: Gracefully handle situations where a service isn't available.
 
 ```java
-AnotherService service = ServiceLocator.getService(AnotherService.class);
+AnotherService service = CoreAPI.Services.get(AnotherService.class);
 if (service == null) {
     // Fallback behavior or inform the user
     getLogger().warning("AnotherService is not available. Some features will be disabled.");
@@ -531,15 +635,15 @@ if (service == null) {
 }
 ```
 
-3. **Unregister Services**: Always unregister your services during your plugin's `onDisable()` method.
+4. **Unregister Services**: Always unregister your services during your plugin's `onDisable()` method.
 
-4. **Separate Interface and Implementation**: Define service interfaces in a separate package from their implementations.
+5. **Separate Interface and Implementation**: Define service interfaces in a separate package from their implementations.
 
-5. **Document Services**: Clearly document what your services do and what other plugins might need them.
+6. **Document Services**: Clearly document what your services do and what other plugins might need them.
 
-6. **Consistent Command Structure**: Use a consistent command structure across all your plugins.
+7. **Consistent Command Structure**: Use a consistent command structure across all your plugins.
 
-7. **Use Debug Mode Appropriately**: Use `LogUtil.debug()` for debugging information, not for regular logging.
+8. **Use Debug Mode Appropriately**: Use `LogUtil.debug()` for debugging information, not for regular logging.
 
 ## Example Plugin
 
@@ -550,6 +654,8 @@ The Example Plugin includes:
 - Command creation using annotations
 - Configuration management
 - Usage of various utility classes
+
+For a quick API usage reference, see the `ExampleApiUsage` class included with Core-Utils.
 
 You can use this as a template for developing new plugins in the modular architecture.
 

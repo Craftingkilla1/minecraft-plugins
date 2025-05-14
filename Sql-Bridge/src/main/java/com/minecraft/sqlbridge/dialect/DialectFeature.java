@@ -2,81 +2,37 @@
 package com.minecraft.sqlbridge.dialect;
 
 /**
- * Enumeration of database dialect features.
+ * Enum for database dialect features.
+ * This allows checking if a specific dialect supports certain features.
  */
 public enum DialectFeature {
     /**
-     * The RETURNING clause for getting values from inserts.
+     * Support for returning values in INSERT, UPDATE, or DELETE statements.
      */
     RETURNING_CLAUSE,
     
     /**
-     * Common Table Expressions (WITH clause).
+     * Support for LIMIT in DELETE statements.
      */
-    COMMON_TABLE_EXPRESSIONS,
+    DELETE_LIMIT,
     
     /**
-     * Window functions (OVER clause).
+     * Support for ORDER BY in DELETE statements.
      */
-    WINDOW_FUNCTIONS,
+    DELETE_ORDER_BY,
     
     /**
-     * JSON data type and operations.
-     */
-    JSON_SUPPORT,
-    
-    /**
-     * Multiple-row insert syntax.
-     */
-    MULTI_ROW_INSERT,
-    
-    /**
-     * UPSERT (INSERT ... ON DUPLICATE KEY UPDATE).
+     * Support for UPSERT operations.
      */
     UPSERT,
     
     /**
-     * CREATE INDEX ... IF NOT EXISTS.
+     * Support for multi-row INSERT statements.
      */
-    CREATE_IF_NOT_EXISTS,
+    MULTI_ROW_INSERT,
     
     /**
-     * DROP ... IF EXISTS.
+     * Support for batch operations.
      */
-    DROP_IF_EXISTS,
-    
-    /**
-     * Batch parameter binding.
-     */
-    BATCH_PARAMETERS,
-    
-    /**
-     * LIMIT with OFFSET.
-     */
-    LIMIT_OFFSET,
-    
-    /**
-     * Generated/computed columns.
-     */
-    GENERATED_COLUMNS,
-    
-    /**
-     * Foreign key constraints.
-     */
-    FOREIGN_KEYS,
-    
-    /**
-     * Transactional DDL.
-     */
-    TRANSACTIONAL_DDL,
-    
-    /**
-     * RENAME TABLE.
-     */
-    RENAME_TABLE,
-    
-    /**
-     * Full-text search.
-     */
-    FULLTEXT_SEARCH
+    BATCH_OPERATIONS
 }

@@ -120,17 +120,13 @@ public class DefaultDeleteBuilder extends AbstractQueryBuilder implements Delete
         }
         
         // ORDER BY clause - only supported by some dialects for DELETE
-        if (orderBy != null) {
-            if (dialect.getDatabaseType().equals("mysql")) {
-                sql.append(" ORDER BY ").append(orderBy);
-            }
+        if (orderBy != null && dialect.supportsFeature(DialectFeature.DELETE_ORDER_BY)) {
+            sql.append(" ORDER BY ").append(orderBy);
         }
         
         // LIMIT clause - only supported by some dialects for DELETE
-        if (limit != null) {
-            if (dialect.getDatabaseType().equals("mysql")) {
-                sql.append(" LIMIT ").append(limit);
-            }
+        if (limit != null && dialect.supportsFeature(DialectFeature.DELETE_LIMIT)) {
+            sql.append(" LIMIT ").append(limit);
         }
         
         // RETURNING clause if supported

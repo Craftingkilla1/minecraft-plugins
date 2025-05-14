@@ -64,4 +64,20 @@ public interface DeleteBuilder extends QueryBuilder {
      * @return This DeleteBuilder for chaining
      */
     DeleteBuilder returning(String... columns);
+    
+    /**
+     * Execute the DELETE query and return the number of affected rows.
+     * This is a safe version that catches and logs exceptions.
+     *
+     * @param logger The logger to use for error logging
+     * @return The number of rows deleted, or 0 if the deletion fails
+     */
+    default int executeUpdateSafe(java.util.logging.Logger logger) {
+        try {
+            return executeUpdate();
+        } catch (java.sql.SQLException e) {
+            logger.log(java.util.logging.Level.SEVERE, "Delete failed: " + getSQL(), e);
+            return 0;
+        }
+    }
 }

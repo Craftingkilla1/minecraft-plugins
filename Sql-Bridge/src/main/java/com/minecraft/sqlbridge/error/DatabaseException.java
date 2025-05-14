@@ -2,9 +2,17 @@
 package com.minecraft.sqlbridge.error;
 
 /**
- * Runtime exception for database-related errors.
+ * Exception class for database errors.
+ * This wraps SQLExceptions and other exceptions that occur during database operations.
  */
 public class DatabaseException extends RuntimeException {
+    
+    /**
+     * Default constructor.
+     */
+    public DatabaseException() {
+        super();
+    }
     
     /**
      * Constructor with a message.
@@ -19,9 +27,18 @@ public class DatabaseException extends RuntimeException {
      * Constructor with a message and a cause.
      *
      * @param message The error message
-     * @param cause The cause of the exception
+     * @param cause The cause of the error
      */
     public DatabaseException(String message, Throwable cause) {
         super(message, cause);
+    }
+    
+    /**
+     * Constructor with a cause.
+     *
+     * @param cause The cause of the error
+     */
+    public DatabaseException(Throwable cause) {
+        super(cause);
     }
 }

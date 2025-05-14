@@ -1,36 +1,25 @@
 // ./Sql-Bridge/src/main/java/com/minecraft/sqlbridge/dialect/MySQLDialect.java
 package com.minecraft.sqlbridge.dialect;
 
-import java.util.Arrays;
-import java.util.HashSet;
+import java.util.EnumSet;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 /**
- * MySQL database dialect implementation.
+ * MySQL dialect implementation.
  */
 public class MySQLDialect implements Dialect {
     
-    private static final Set<DialectFeature> SUPPORTED_FEATURES = new HashSet<>(Arrays.asList(
-        DialectFeature.MULTI_ROW_INSERT,
-        DialectFeature.UPSERT,
-        DialectFeature.DROP_IF_EXISTS,
-        DialectFeature.BATCH_PARAMETERS,
-        DialectFeature.LIMIT_OFFSET,
-        DialectFeature.FOREIGN_KEYS,
-        DialectFeature.RENAME_TABLE,
-        DialectFeature.FULLTEXT_SEARCH,
-        DialectFeature.JSON_SUPPORT
-    ));
+    private static final Set<DialectFeature> SUPPORTED_FEATURES = EnumSet.of(
+            DialectFeature.DELETE_LIMIT,
+            DialectFeature.DELETE_ORDER_BY,
+            DialectFeature.MULTI_ROW_INSERT,
+            DialectFeature.BATCH_OPERATIONS,
+            DialectFeature.UPSERT
+    );
     
     @Override
     public String getDatabaseType() {
         return "mysql";
-    }
-    
-    @Override
-    public boolean supportsFeature(DialectFeature feature) {
-        return SUPPORTED_FEATURES.contains(feature);
     }
     
     @Override
@@ -46,8 +35,20 @@ public class MySQLDialect implements Dialect {
     }
     
     @Override
-    public String getLimitClause(int limit, Integer offset) {
-        if (offset != null) {
+    public String getReturningClause(String columns) {
+        // MySQL doesn't support RETURNING, but some versions 
+        // have a non-standard way using SELECT LAST_INSERT_ID()
+        // For simplicity, we'll return null here
+        return null;
+    }
+    
+    @Override
+    public String getLimitClause(Integer limit, Integer offset) {
+        if (limit == null) {
+            return "";
+        }
+        
+        if (offset != null && offset > 0) {
             return "LIMIT " + offset + ", " + limit;
         } else {
             return "LIMIT " + limit;
@@ -55,79 +56,7 @@ public class MySQLDialect implements Dialect {
     }
     
     @Override
-    public String getCreateDatabaseSQL(String databaseName) {
-        return "CREATE DATABASE IF NOT EXISTS `" + databaseName + 
-               "` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci";
-    }
-    
-    @Override
-    public String getCreateTableWithAutoIncrementSQL(String tableName, String primaryKeyColumn) {
-        return "CREATE TABLE IF NOT EXISTS " + formatTableName(tableName) + " (" +
-               formatColumnName(primaryKeyColumn) + " INT AUTO_INCREMENT PRIMARY KEY)";
-    }
-    
-    @Override
-    public String getPaginationSQL(String innerQuery, int page, int pageSize) {
-        int offset = (page - 1) * pageSize;
-        return innerQuery + " LIMIT " + offset + ", " + pageSize;
-    }
-    
-    @Override
-    public String getCaseInsensitiveLikeSQL(String column, String pattern) {
-        return column + " LIKE " + pattern + " COLLATE utf8mb4_unicode_ci";
-    }
-    
-    @Override
-    public String getParameterPlaceholder(int index) {
-        return "?";
-    }
-    
-    @Override
-    public String getCurrentTimestampSQL() {
-        return "NOW()";
-    }
-    
-    @Override
-    public String getRandomOrderSQL() {
-        return "RAND()";
-    }
-    
-    @Override
-    public String getIfExistsSQL() {
-        return "IF EXISTS";
-    }
-    
-    @Override
-    public String getBatchInsertSQL(String tableName, String[] columns, int batchSize) {
-        String columnList = Arrays.stream(columns)
-                                 .map(this::formatColumnName)
-                                 .collect(Collectors.joining(", "));
-        
-        StringBuilder sql = new StringBuilder("INSERT INTO ")
-                              .append(formatTableName(tableName))
-                              .append(" (").append(columnList).append(") VALUES ");
-        
-        // Create placeholders for each row
-        String rowPlaceholders = "(" + 
-                                 Arrays.stream(columns)
-                                       .map(c -> "?")
-                                       .collect(Collectors.joining(", ")) + 
-                                 ")";
-        
-        // Add placeholders for each batch row
-        for (int i = 0; i < batchSize; i++) {
-            if (i > 0) {
-                sql.append(", ");
-            }
-            sql.append(rowPlaceholders);
-        }
-        
-        return sql.toString();
-    }
-    
-    @Override
-    public String getReturningClause(String columnName) {
-        // MySQL doesn't support RETURNING clause
-        return null;
+    public boolean supportsFeature(DialectFeature feature) {
+        return SUPPORTED_FEATURES.contains(feature);
     }
 }

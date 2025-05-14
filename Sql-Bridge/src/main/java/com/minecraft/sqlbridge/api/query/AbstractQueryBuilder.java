@@ -3,15 +3,18 @@ package com.minecraft.sqlbridge.api.query;
 
 import com.minecraft.sqlbridge.api.Database;
 import com.minecraft.sqlbridge.api.result.ResultMapper;
+import com.minecraft.sqlbridge.error.DatabaseException;
 
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
 /**
- * Abstract implementation of QueryBuilder that provides common functionality.
+ * Abstract base class for query builders.
+ * Provides common functionality for all query builders.
  */
 public abstract class AbstractQueryBuilder implements QueryBuilder {
     
@@ -23,9 +26,18 @@ public abstract class AbstractQueryBuilder implements QueryBuilder {
      *
      * @param database The database to use for executing queries
      */
-    protected AbstractQueryBuilder(Database database) {
+    public AbstractQueryBuilder(Database database) {
         this.database = database;
         this.parameters = new ArrayList<>();
+    }
+    
+    /**
+     * Add parameters to the parameter list.
+     *
+     * @param params The parameters to add
+     */
+    protected void addParameters(Object... params) {
+        parameters.addAll(Arrays.asList(params));
     }
     
     @Override
@@ -35,59 +47,52 @@ public abstract class AbstractQueryBuilder implements QueryBuilder {
     
     @Override
     public <T> List<T> executeQuery(ResultMapper<T> mapper) throws SQLException {
-        return database.query(getSQL(), mapper, getParameters());
+        String sql = getSQL();
+        return database.query(sql, mapper, getParameters());
     }
     
     @Override
     public <T> CompletableFuture<List<T>> executeQueryAsync(ResultMapper<T> mapper) {
-        return database.queryAsync(getSQL(), mapper, getParameters());
+        String sql = getSQL();
+        return database.queryAsync(sql, mapper, getParameters());
     }
     
     @Override
     public <T> Optional<T> executeQueryFirst(ResultMapper<T> mapper) throws SQLException {
-        return database.queryFirst(getSQL(), mapper, getParameters());
+        String sql = getSQL();
+        return database.queryFirst(sql, mapper, getParameters());
     }
     
     @Override
     public <T> CompletableFuture<Optional<T>> executeQueryFirstAsync(ResultMapper<T> mapper) {
-        return database.queryFirstAsync(getSQL(), mapper, getParameters());
+        String sql = getSQL();
+        return database.queryFirstAsync(sql, mapper, getParameters());
     }
     
     @Override
     public int executeUpdate() throws SQLException {
-        return database.update(getSQL(), getParameters());
+        String sql = getSQL();
+        return database.update(sql, getParameters());
     }
     
     @Override
     public CompletableFuture<Integer> executeUpdateAsync() {
-        return database.updateAsync(getSQL(), getParameters());
+        String sql = getSQL();
+        return database.updateAsync(sql, getParameters());
     }
     
     /**
-     * Add parameters to the parameter list.
+     * Execute the query and return the number of affected rows with safe error handling.
      *
-     * @param newParameters The parameters to add
+     * @param logger The logger to use for error logging
+     * @return The number of rows affected, or 0 if the update fails
      */
-    protected void addParameters(Object... newParameters) {
-        for (Object param : newParameters) {
-            parameters.add(param);
+    public int executeUpdateSafe(java.util.logging.Logger logger) {
+        try {
+            return executeUpdate();
+        } catch (SQLException e) {
+            logger.log(java.util.logging.Level.SEVERE, "Query execution failed: " + getSQL(), e);
+            return 0;
         }
-    }
-    
-    @Override
-    public String toString() {
-        StringBuilder sb = new StringBuilder();
-        sb.append("SQL: ").append(getSQL()).append("\n");
-        sb.append("Parameters: [");
-        
-        for (int i = 0; i < parameters.size(); i++) {
-            if (i > 0) {
-                sb.append(", ");
-            }
-            sb.append(parameters.get(i));
-        }
-        
-        sb.append("]");
-        return sb.toString();
     }
 }
