@@ -194,7 +194,7 @@ public class YourPlugin extends JavaPlugin {
     }
     
     private boolean initDatabase() {
-        // Using the new initializeDatabase convenience method
+        // Using the initializeDatabase convenience method
         return databaseService.initializeDatabase(this,
             "CREATE TABLE IF NOT EXISTS players (" +
             "id INT AUTO_INCREMENT PRIMARY KEY, " +
@@ -698,6 +698,85 @@ public void onEnable() {
     int appliedCount = databaseService.runMigrationsSafe(this);
     getLogger().info("Applied " + appliedCount + " migrations");
 }
+```
+
+You can also use anonymous inner classes for simpler migrations:
+
+```java
+// Register migrations
+List<Migration> migrations = new ArrayList<>();
+
+// Add migration to create a new table
+migrations.add(new Migration() {
+    @Override
+    public int getVersion() {
+        return 1;
+    }
+    
+    @Override
+    public String getDescription() {
+        return "Create leaderboard table";
+    }
+    
+    @Override
+    public void migrate(Connection connection) throws SQLException {
+        try (Statement stmt = connection.createStatement()) {
+            stmt.execute("CREATE TABLE leaderboard (" +
+                        "id INT AUTO_INCREMENT PRIMARY KEY, " +
+                        "player_id INT NOT NULL, " +
+                        "score INT NOT NULL, " +
+                        "FOREIGN KEY (player_id) REFERENCES players(id))");
+        }
+    }
+    
+    @Override
+    public void rollback(Connection connection) throws SQLException {
+        try (Statement stmt = connection.createStatement()) {
+            stmt.execute("DROP TABLE IF EXISTS leaderboard");
+        }
+    }
+});
+
+// Add a second migration to add a column
+migrations.add(new Migration() {
+    @Override
+    public int getVersion() {
+        return 2;
+    }
+    
+    @Override
+    public String getDescription() {
+        return "Add timestamp column to leaderboard";
+    }
+    
+    @Override
+    public void migrate(Connection connection) throws SQLException {
+        try (Statement stmt = connection.createStatement()) {
+            stmt.execute("ALTER TABLE leaderboard " +
+                        "ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP");
+        }
+    }
+    
+    @Override
+    public void rollback(Connection connection) throws SQLException {
+        try (Statement stmt = connection.createStatement()) {
+            stmt.execute("ALTER TABLE leaderboard DROP COLUMN created_at");
+        }
+    }
+});
+
+// Register migrations with the database service
+databaseService.registerMigrations(this, migrations);
+
+// Run migrations
+int appliedCount = databaseService.runMigrationsSafe(this);
+getLogger().info("Applied " + appliedCount + " migrations");
+```
+
+Note: To use the Migration interface, you need to import it from the API package:
+
+```java
+import com.minecraft.sqlbridge.api.migration.Migration;
 ```
 
 ### Error Handling
