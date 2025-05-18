@@ -1,0 +1,160 @@
+# ./Example-Plugin/src/main/resources/achievements/default.yml
+# Default Achievements Configuration
+# This file defines custom achievements that will be loaded by the AchievementManagerFeature
+
+# First Join Achievement
+first_join:
+  name: "First Steps"
+  description: "Join the server for the first time"
+  icon: "GRASS_BLOCK"
+  # No conditions needed for first join
+  rewards:
+    experience: 50
+    items:
+      - material: "APPLE"
+        amount: 5
+      - material: "BREAD"
+        amount: 3
+
+# Block Breaking Achievements
+blocks_broken_100:
+  name: "Demolition Expert"
+  description: "Break 100 blocks"
+  icon: "IRON_PICKAXE"
+  conditions:
+    blocks_broken: 100
+  rewards:
+    experience: 100
+    items:
+      - material: "IRON_PICKAXE"
+        amount: 1
+
+blocks_broken_1000:
+  name: "Block Destroyer"
+  description: "Break 1,000 blocks"
+  icon: "DIAMOND_PICKAXE"
+  conditions:
+    blocks_broken: 1000
+  rewards:
+    experience: 500
+    items:
+      - material: "DIAMOND_PICKAXE"
+        amount: 1
+      - material: "DIAMOND"
+        amount: 3
+
+# Block Placing Achievements
+blocks_placed_100:
+  name: "Constructor"
+  description: "Place 100 blocks"
+  icon: "BRICK"
+  conditions:
+    blocks_placed: 100
+  rewards:
+    experience: 100
+    items:
+      - material: "BRICK"
+        amount: 16
+
+blocks_placed_1000:
+  name: "Master Builder"
+  description: "Place 1,000 blocks"
+  icon: "BRICKS"
+  conditions:
+    blocks_placed: 1000
+  rewards:
+    experience: 500
+    items:
+      - material: "DIAMOND"
+        amount: 1
+
+# PvP Achievements
+player_kills_10:
+  name: "PvP Novice"
+  description: "Defeat 10 players"
+  icon: "IRON_SWORD"
+  conditions:
+    player_kills: 10
+  rewards:
+    experience: 200
+    items:
+      - material: "GOLDEN_APPLE"
+        amount: 2
+
+# Mob Killing Achievements
+mob_kills_100:
+  name: "Monster Hunter"
+  description: "Defeat 100 mobs"
+  icon: "BOW"
+  conditions:
+    mob_kills: 100
+  rewards:
+    experience: 150
+    items:
+      - material: "ARROW"
+        amount: 64
+
+# Playtime Achievements
+playtime_1_hour:
+  name: "Dedicated"
+  description: "Play for 1 hour"
+  icon: "CLOCK"
+  conditions:
+    playtime_seconds: 3600
+  rewards:
+    experience: 100
+
+playtime_10_hours:
+  name: "Veteran"
+  description: "Play for 10 hours"
+  icon: "COMPASS"
+  conditions:
+    playtime_seconds: 36000
+  rewards:
+    experience: 500
+    items:
+      - material: "DIAMOND"
+        amount: 5
+
+# Distance Achievements
+distance_1_km:
+  name: "Explorer"
+  description: "Travel 1 kilometer"
+  icon: "LEATHER_BOOTS"
+  conditions:
+    distance_traveled: 1000
+  rewards:
+    experience: 100
+    items:
+      - material: "COOKED_BEEF"
+        amount: 5
+
+distance_10_km:
+  name: "Globe Trotter"
+  description: "Travel 10 kilometers"
+  icon: "ELYTRA"
+  conditions:
+    distance_traveled: 10000
+  rewards:
+    experience: 500
+    items:
+      - material: "FIREWORK_ROCKET"
+        amount: 16
+
+# Combined Achievements
+adventurer:
+  name: "Adventurer"
+  description: "Become a true adventurer"
+  icon: "MAP"
+  conditions:
+    blocks_broken: 500
+    blocks_placed: 500
+    mob_kills: 50
+    distance_traveled: 5000
+  rewards:
+    experience: 1000
+    items:
+      - material: "DIAMOND"
+        amount: 10
+      - material: "EMERALD"
+        amount: 5

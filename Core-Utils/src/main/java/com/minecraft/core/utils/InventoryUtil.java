@@ -1,10 +1,13 @@
+// ./Core-Utils/src/main/java/com/minecraft/core/utils/InventoryUtil.java
 package com.minecraft.core.utils;
 
+import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Material;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
+import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.ItemFlag;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
@@ -15,11 +18,15 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
+import java.util.Map;
+import java.util.HashMap;
 
 /**
  * Utility class for inventory-related operations
  */
 public class InventoryUtil {
+    // Map to store menu click handlers
+    private static final Map<String, Map<Integer, Consumer<Player>>> clickHandlers = new HashMap<>();
     
     private InventoryUtil() {
         // Private constructor to prevent instantiation
@@ -193,6 +200,18 @@ public class InventoryUtil {
     }
     
     /**
+     * Create an inventory with a custom title
+     * 
+     * @param holder The inventory holder, or null for no holder
+     * @param size The inventory size (must be a multiple of 9)
+     * @param title The inventory title (supports color codes with &)
+     * @return The created inventory
+     */
+    public static Inventory createInventory(InventoryHolder holder, int size, String title) {
+        return Bukkit.createInventory(holder, size, ChatColor.translateAlternateColorCodes('&', title));
+    }
+    
+    /**
      * Create a confirmation menu with yes and no options
      * @param title The menu title
      * @param yesAction What to do when Yes is clicked
@@ -200,7 +219,7 @@ public class InventoryUtil {
      * @return The confirmation menu
      */
     public static Inventory createConfirmationMenu(String title, Consumer<Player> yesAction, Consumer<Player> noAction) {
-        Inventory inventory = org.bukkit.Bukkit.createInventory(null, 27, title);
+        Inventory inventory = createInventory(null, 27, title);
         
         // Add yes button
         ItemStack yesButton = createItem(Material.LIME_WOOL, "&a&lYes", "&7Click to confirm");
@@ -214,7 +233,80 @@ public class InventoryUtil {
         ItemStack divider = createDivider(Material.BLACK_STAINED_GLASS_PANE);
         fillEmptySlots(inventory, divider);
         
+        // Register click handlers
+        String inventoryId = title;
+        
+        Map<Integer, Consumer<Player>> handlers = new HashMap<>();
+        handlers.put(11, yesAction);
+        handlers.put(15, noAction);
+        
+        clickHandlers.put(inventoryId, handlers);
+        
         return inventory;
+    }
+    
+    /**
+     * Create a confirmation inventory with a custom message and actions
+     * 
+     * @param title The inventory title
+     * @param message The confirmation message (supports color codes with &)
+     * @param yesAction Action to run when player clicks Yes
+     * @param noAction Action to run when player clicks No
+     * @return The created inventory
+     */
+    public static Inventory createConfirmationInventory(String title, String message, Consumer<Player> yesAction, Consumer<Player> noAction) {
+        Inventory inventory = createInventory(null, 36, title);
+        
+        // Create message item
+        ItemStack messageItem = createItem(Material.PAPER, "&f&lConfirmation", message);
+        inventory.setItem(13, messageItem);
+        
+        // Add yes button
+        ItemStack yesButton = createItem(Material.LIME_WOOL, "&a&lYes", "&7Click to confirm");
+        inventory.setItem(20, yesButton);
+        
+        // Add no button
+        ItemStack noButton = createItem(Material.RED_WOOL, "&c&lNo", "&7Click to cancel");
+        inventory.setItem(24, noButton);
+        
+        // Fill with glass panes
+        ItemStack fillerItem = createDivider(Material.BLACK_STAINED_GLASS_PANE);
+        fillEmptySlots(inventory, fillerItem);
+        
+        // Register click handlers
+        String inventoryId = title;
+        
+        Map<Integer, Consumer<Player>> handlers = new HashMap<>();
+        handlers.put(20, yesAction);
+        handlers.put(24, noAction);
+        
+        clickHandlers.put(inventoryId, handlers);
+        
+        return inventory;
+    }
+    
+    /**
+     * Get the click handler for a specific slot in an inventory
+     * 
+     * @param inventoryTitle The inventory title
+     * @param slot The slot number
+     * @return The click handler, or null if none exists
+     */
+    public static Consumer<Player> getClickHandler(String inventoryTitle, int slot) {
+        Map<Integer, Consumer<Player>> handlers = clickHandlers.get(inventoryTitle);
+        if (handlers != null) {
+            return handlers.get(slot);
+        }
+        return null;
+    }
+    
+    /**
+     * Remove click handlers for an inventory
+     * 
+     * @param inventoryTitle The inventory title
+     */
+    public static void removeClickHandlers(String inventoryTitle) {
+        clickHandlers.remove(inventoryTitle);
     }
     
     /**

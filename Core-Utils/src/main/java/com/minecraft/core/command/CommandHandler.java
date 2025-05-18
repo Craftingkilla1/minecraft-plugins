@@ -1,3 +1,4 @@
+// ./Core-Utils/src/main/java/com/minecraft/core/command/CommandHandler.java
 package com.minecraft.core.command;
 
 import com.minecraft.core.command.annotation.Command;
@@ -25,6 +26,7 @@ public class CommandHandler implements CommandExecutor, TabCompleter {
     private final Command commandAnnotation;
     private final Map<String, SubCommandInfo> subCommands = new LinkedHashMap<>();
     private final Map<String, String> subCommandAliases = new HashMap<>();
+    private SubCommandInfo defaultSubCommand = null;
     
     /**
      * Creates a new command handler
@@ -48,36 +50,62 @@ public class CommandHandler implements CommandExecutor, TabCompleter {
      */
     public void registerSubCommand(String name, Method method, SubCommand annotation) {
         SubCommandInfo info = new SubCommandInfo(name, method, annotation);
-        subCommands.put(name.toLowerCase(), info);
         
-        // Register aliases
-        for (String alias : annotation.aliases()) {
-            subCommandAliases.put(alias.toLowerCase(), name.toLowerCase());
+        // Handle default subcommand
+        if (annotation.isDefault() || name.isEmpty()) {
+            defaultSubCommand = info;
+            LogUtil.debug("Registered default subcommand for command: " + commandAnnotation.name());
+        }
+        
+        // Only register in the map if it has a name
+        if (!name.isEmpty()) {
+            subCommands.put(name.toLowerCase(), info);
+            
+            // Register aliases
+            for (String alias : annotation.aliases()) {
+                subCommandAliases.put(alias.toLowerCase(), name.toLowerCase());
+            }
         }
     }
     
     @Override
     public boolean onCommand(CommandSender sender, org.bukkit.command.Command command, String label, String[] args) {
-        // If no args provided, either show help or execute default command
+        SubCommandInfo subCommand = null;
+        String[] subArgs;
+        
+        // If no args provided, either use default command or show help
         if (args.length == 0) {
-            showHelp(sender);
-            return true;
+            if (defaultSubCommand != null) {
+                subCommand = defaultSubCommand;
+                subArgs = args;
+            } else {
+                showHelp(sender);
+                return true;
+            }
+        } else {
+            String subCommandName = args[0].toLowerCase();
+            
+            // Check for aliases
+            if (subCommandAliases.containsKey(subCommandName)) {
+                subCommandName = subCommandAliases.get(subCommandName);
+            }
+            
+            // Get the subcommand
+            subCommand = subCommands.get(subCommandName);
+            if (subCommand == null) {
+                // If no matching subcommand found, try the default command if it exists
+                if (defaultSubCommand != null) {
+                    subCommand = defaultSubCommand;
+                    subArgs = args;
+                } else {
+                    showHelp(sender);
+                    return true;
+                }
+            } else {
+                subArgs = Arrays.copyOfRange(args, 1, args.length);
+            }
         }
-        
-        String subCommandName = args[0].toLowerCase();
-        
-        // Check for aliases
-        if (subCommandAliases.containsKey(subCommandName)) {
-            subCommandName = subCommandAliases.get(subCommandName);
-        }
-        
-        // Get the subcommand
-        SubCommandInfo subCommand = subCommands.get(subCommandName);
-        if (subCommand == null) {
-            showHelp(sender);
-            return true;
-        }
-        
+
         // Check permission
         if (!hasPermission(sender, subCommand)) {
             String message = "";
@@ -95,7 +123,6 @@ public class CommandHandler implements CommandExecutor, TabCompleter {
         }
         
         // Check arg count
-        String[] subArgs = Arrays.copyOfRange(args, 1, args.length);
         if (subArgs.length < subCommand.annotation.minArgs()) {
             sender.sendMessage(ChatColor.RED + "Not enough arguments. Usage: " + getUsage(subCommand));
             return true;
@@ -110,12 +137,12 @@ public class CommandHandler implements CommandExecutor, TabCompleter {
         try {
             subCommand.method.invoke(commandInstance, sender, subArgs);
         } catch (InvocationTargetException e) {
-            LogUtil.severe("Error executing command: " + subCommandName);
+            LogUtil.severe("Error executing command: " + (subCommand.name.isEmpty() ? "(default)" : subCommand.name));
             LogUtil.severe("Cause: " + e.getCause().getMessage());
             e.getCause().printStackTrace();
             sender.sendMessage(ChatColor.RED + "An error occurred while executing the command.");
         } catch (Exception e) {
-            LogUtil.severe("Error executing command: " + subCommandName);
+            LogUtil.severe("Error executing command: " + (subCommand.name.isEmpty() ? "(default)" : subCommand.name));
             LogUtil.severe("Error: " + e.getMessage());
             e.printStackTrace();
             sender.sendMessage(ChatColor.RED + "An error occurred while executing the command.");
@@ -174,6 +201,21 @@ public class CommandHandler implements CommandExecutor, TabCompleter {
                         completions.addAll(providedCompletions);
                     }
                 }
+            } else if (defaultSubCommand != null && hasPermission(sender, defaultSubCommand)) {
+                // Try tab completions for default command
+                if (commandInstance instanceof TabCompletionProvider) {
+                    TabCompletionProvider provider = (TabCompletionProvider) commandInstance;
+                    
+                    List<String> providedCompletions = provider.getTabCompletions(
+                        "", 
+                        sender, 
+                        args
+                    );
+                    
+                    if (providedCompletions != null) {
+                        completions.addAll(providedCompletions);
+                    }
+                }
             }
         }
         
@@ -187,6 +229,18 @@ public class CommandHandler implements CommandExecutor, TabCompleter {
      */
     private void showHelp(CommandSender sender) {
         sender.sendMessage(ChatColor.GREEN + "=== " + commandAnnotation.name() + " Commands ===");
+        
+        // If there's a default command, show it first
+        if (defaultSubCommand != null && hasPermission(sender, defaultSubCommand)) {
+            String description = defaultSubCommand.annotation.description();
+            if (description.isEmpty()) {
+                description = "Default command";
+            }
+            
+            sender.sendMessage(ChatColor.YELLOW + "/" + commandAnnotation.name() + " " + 
+                             getUsage(defaultSubCommand) +
+                             ChatColor.WHITE + " - " + description);
+        }
         
         for (SubCommandInfo subCommand : subCommands.values()) {
             if (hasPermission(sender, subCommand)) {
@@ -252,6 +306,15 @@ public class CommandHandler implements CommandExecutor, TabCompleter {
      */
     public String getCommandName() {
         return commandAnnotation.name();
+    }
+    
+    /**
+     * Check if a default subcommand is registered
+     * 
+     * @return true if a default subcommand is registered
+     */
+    public boolean hasDefaultSubCommand() {
+        return defaultSubCommand != null;
     }
     
     /**

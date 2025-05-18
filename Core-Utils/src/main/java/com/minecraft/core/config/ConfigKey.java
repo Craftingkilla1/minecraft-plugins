@@ -1,4 +1,4 @@
-package com.minecraft.invitesystem.config;
+package com.minecraft.core.config;
 
 /**
  * Enum of all configuration keys with their default values and types

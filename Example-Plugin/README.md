@@ -1,253 +1,213 @@
-# PlayerStats Plugin
+# Example-Plugin
 
-A comprehensive player statistics tracking plugin that demonstrates the integration of Core-Utils and SQL-Bridge functionality.
+A reference implementation demonstrating the functionality of Core-Utils and SQL-Bridge in a Minecraft plugin.
 
-## Overview
+## 🚀 Features
 
-PlayerStats tracks a wide range of player statistics, from blocks broken to distance traveled, and awards achievements based on these statistics. It also features leaderboards to encourage competition among players.
+This plugin serves as a comprehensive example of how to use both Core-Utils and SQL-Bridge in your own plugins, including:
 
-This plugin serves as a practical example of how to use the Core-Utils and SQL-Bridge libraries in your own plugins, demonstrating:
+### Core-Utils Showcase
+- **Service Registry System**: Demonstrates registering and consuming services
+- **Command Framework**: Showcases annotation-based command creation
+- **Configuration Management**: Shows how to manage plugin configuration effectively
+- **Utility Classes**: Examples of various utility classes in action
 
-- Service-based architecture using the Service Registry system
-- Annotation-based command framework
-- Database integration with SQL-Bridge
-- GUI creation with InventoryUtil
-- Configuration management
+### SQL-Bridge Showcase
+- **Database Operations**: Examples of basic and advanced database operations
+- **Data Access Objects (DAOs)**: Demonstrates the DAO pattern implementation
+- **Migration System**: Shows how to handle schema migrations
+- **Query Builder API**: Examples of using the fluent query builder
 
-## Features
+### Integrated Features
+- **Player Statistics**: Tracks and displays various player statistics
+- **Achievement System**: Awards and tracks player achievements
+- **Admin Tools**: Administrative commands and tools for server management
 
-- **Extensive Statistics Tracking**: Automatically records player activities including blocks broken/placed, combat, movement, and more
-- **Achievement System**: Awards achievements when players meet specific criteria
-- **Leaderboards**: Shows top players for different statistics
-- **Player Commands**: View personal and other players' statistics
-- **Admin Commands**: Manage statistics, achievements, and leaderboards
-- **Interactive GUI**: Browse statistics and achievements with an intuitive menu interface
-- **SQLite Database**: Persistent storage of all player data
+## 📋 Requirements
 
-## Commands
+- Spigot/Paper server 1.16.5 or higher
+- Core-Utils plugin
+- SQL-Bridge plugin (optional, but recommended for full functionality)
 
-### Player Commands
+## 📥 Installation
 
-- `/stats` - Opens the statistics menu
-- `/stats show` - Shows your statistics in chat
-- `/stats show <player>` - Shows another player's statistics
-- `/stats compare <player>` - Compares your statistics with another player
-- `/stats top <stat> [limit]` - Shows top players for a specific statistic
-- `/stats help` - Shows help information
+1. Download the latest versions of Core-Utils, SQL-Bridge, and Example-Plugin
+2. Place all three JAR files in your server's `plugins` directory
+3. Start or restart your server
+4. The plugins will generate their configuration files automatically
+
+## ⚙️ Configuration
+
+Configuration files are located in the `plugins/Example-Plugin` directory:
+
+### config.yml
+Controls the main plugin settings:
+```yaml
+# Plugin features
+features:
+  database_integration: true  # Enable/disable database features
+  stat_tracking: true         # Enable/disable stat tracking
+  achievements: true          # Enable/disable achievements
+  admin_tools: true           # Enable/disable admin tools
+
+# Statistics tracking settings
+statistics:
+  save_interval: 300          # Auto-save interval in seconds
+  track_blocks_broken: true   # Track blocks broken
+  # ... other tracking options
+```
+
+### messages.yml
+Contains all messages displayed by the plugin:
+```yaml
+prefix: "&8[&bExample&8] &r"
+# ... various messages
+```
+
+## 📝 Commands
+
+### Main Commands
+- `/example` - Shows plugin information
+  - `/example help` - Shows help information
+  - `/example reload` - Reloads configuration
+  - `/example version` - Shows plugin version
+  - `/example info` - Shows detailed information
+  - `/example debug` - Toggles debug mode
+  - `/example database` - Shows database information
+
+### Statistics Commands
+- `/stats` - Shows your statistics
+  - `/stats <player>` - Shows another player's statistics
+  - `/stats reset [player]` - Resets statistics
+  - `/stats top <stat> [limit]` - Shows top players for a stat
+
+### Achievement Commands
+- `/achievements` - Shows your achievements
+  - `/achievements <player>` - Shows another player's achievements
+  - `/achievements list` - Lists all available achievements
+  - `/achievements award <player> <achievement>` - Awards an achievement
+  - `/achievements recent [limit]` - Shows recently earned achievements
+  - `/achievements check [player]` - Checks for new achievements
 
 ### Admin Commands
+- `/admin` - Shows admin menu
+  - `/admin stats` - Shows database statistics
+  - `/admin export <type>` - Exports data to files
+  - `/admin purge <days> [confirm]` - Purges inactive players
+  - `/admin backup` - Backs up database data
+  - `/admin repair` - Repairs database issues
 
-- `/admin reset <player> [stat]` - Resets statistics for a player
-- `/admin modify <player> <stat> <value>` - Modifies a statistic value for a player
-- `/admin achievement <list|reset> [player]` - Manages achievements
-- `/admin maintenance` - Performs database maintenance tasks
+## 🔧 Permissions
 
-### Leaderboard Commands
+The plugin uses the following permission nodes:
 
-- `/leaderboard list` - Lists all available leaderboards
-- `/leaderboard view <id>` - Views a specific leaderboard
-- `/leaderboard create <id> <displayName> <statName>` - Creates a new leaderboard
-- `/leaderboard delete <id>` - Deletes a leaderboard
-- `/leaderboard update <id>` - Manually updates a leaderboard
+### General Permissions
+- `exampleplugin.use` - Access to basic commands (default: true)
+- `exampleplugin.admin` - Access to admin commands (default: op)
 
-## Permissions
+### Stats Permissions
+- `exampleplugin.stats` - Access to stats commands (default: true)
+- `exampleplugin.stats.others` - View other players' stats (default: op)
+- `exampleplugin.stats.reset` - Reset statistics (default: op)
 
-- `playerstats.view.others` - Allows viewing other players' statistics
-- `playerstats.admin` - Allows access to administrative commands
-- `playerstats.reset` - Allows resetting player statistics
-- `playerstats.modify` - Allows modifying player statistics
-- `playerstats.leaderboard.manage` - Allows managing leaderboards
+### Achievement Permissions
+- `exampleplugin.achievements` - Access to achievement commands (default: true)
+- `exampleplugin.achievements.others` - View other players' achievements (default: op)
+- `exampleplugin.achievements.award` - Award achievements (default: op)
 
-## Core-Utils Integration
+## 💻 Developer Guide
 
-This plugin demonstrates the following Core-Utils features:
+### Service Implementation
 
-### Service Registry System
-
+This example demonstrates how to define a service interface:
 ```java
-// Service registration
-ServiceRegistry.register(StatsService.class, statsService);
-ServiceRegistry.register(AchievementService.class, achievementService);
-ServiceRegistry.register(LeaderboardService.class, leaderboardService);
+// Define the service interface
+public interface StatsService {
+    boolean incrementStat(Player player, String statName, int value);
+    // ... other methods
+}
 
-// Service consumption
-StatsService statsService = ServiceRegistry.getService(StatsService.class);
+// Implement the service
+public class DefaultStatsService implements StatsService {
+    // ... implementation
+}
+
+// Register the service
+CoreAPI.Services.register(StatsService.class, new DefaultStatsService(this));
+
+// Consume the service elsewhere
+StatsService statsService = CoreAPI.Services.get(StatsService.class);
+if (statsService != null) {
+    statsService.incrementStat(player, "blocks_broken", 1);
+}
 ```
 
-### Annotation-based Command Framework
+### Command Implementation
 
+Creating commands using the annotation framework:
 ```java
-@Command(name = "stats", description = "View player statistics", aliases = {"playerstats", "pstats"})
-public class StatsCommand implements TabCompletionProvider {
+@Command(name = "example", description = "Main command for Example-Plugin", aliases = {"exp"})
+@Permission("exampleplugin.use")
+public class ExampleCommand implements TabCompletionProvider {
     
-    @SubCommand(name = "show", description = "View stats in chat format")
-    public void showCommand(CommandSender sender, String[] args) {
-        // Command implementation
+    @SubCommand(description = "Shows plugin information")
+    public void defaultCommand(CommandSender sender, String[] args) {
+        // Implementation for /example
     }
     
-    @SubCommand(name = "compare", description = "Compare stats with another player", minArgs = 1)
-    @Permission(value = "playerstats.view.others", message = "You don't have permission to compare stats.")
-    public void compareCommand(CommandSender sender, String[] args) {
-        // Command implementation
+    @SubCommand(name = "reload", description = "Reloads the plugin")
+    @Permission("exampleplugin.admin")
+    public void reloadCommand(CommandSender sender, String[] args) {
+        // Implementation for /example reload
+    }
+    
+    // Tab completion implementation
+    @Override
+    public List<String> getTabCompletions(String subCommand, CommandSender sender, String[] args) {
+        // Implementation
     }
 }
 ```
 
-### Configuration Management
+### Database Operations
 
+Example of using the SQL-Bridge DAO pattern:
 ```java
-// Loading configuration
-this.configManager = new ConfigManager(this);
-this.pluginConfig = new PluginConfig(this, configManager);
-this.messageConfig = new MessageConfig(this, configManager);
-
-// Using messages
-messageConfig.sendMessage(player, "welcome");
-messageConfig.sendSuccessMessage(player, "stats.modified", "player", targetName, "stat", statName, "value", String.valueOf(value));
-```
-
-### Utility Classes
-
-```java
-// LogUtil example
-LogUtil.init(this);
-LogUtil.info("PlayerStats plugin enabled successfully!");
-LogUtil.debug("Processing batched stats for " + statBatch.size() + " players");
-
-// FormatUtil example
-String formattedNumber = FormatUtil.formatNumber(value);
-String displayName = FormatUtil.capitalizeWords(statName.replace('_', ' '));
-
-// InventoryUtil example
-ItemStack item = InventoryUtil.createItem(material, 
-        ChatColor.YELLOW + displayName,
-        ChatColor.WHITE + "Value: " + ChatColor.GOLD + FormatUtil.formatNumber(value));
-```
-
-## SQL-Bridge Integration
-
-This plugin demonstrates the following SQL-Bridge features:
-
-### Database Setup
-
-```java
-// Get the database service from SQL-Bridge
-DatabaseService databaseService = ServiceRegistry.getService(DatabaseService.class);
-this.database = databaseService.getDatabaseForPlugin(plugin.getName());
-
-// Register database migrations
-List<Migration> migrations = new ArrayList<>();
-migrations.add(new CreateInitialTables());
-migrations.add(new AddIndexesMigration());
-databaseService.registerMigrations(plugin.getName(), migrations);
-```
-
-### Database Queries
-
-```java
-// Simple query example
-int value = database.queryFirst(
-        "SELECT stat_value FROM stats WHERE player_id = ? AND stat_name = ?",
-        rs -> rs.getInt("stat_value"),
-        playerId, statName
-).orElse(0);
-
-// Query with list result
-List<Achievement> achievements = database.query(
-        "SELECT a.achievement_id, a.name, a.description, a.icon_material, a.category, " +
-        "a.secret, a.criteria_json, pa.earned_date " +
-        "FROM achievements a " +
-        "JOIN player_achievements pa ON a.achievement_id = pa.achievement_id " +
-        "WHERE pa.player_id = ?",
-        this::mapAchievement,
-        playerId
-);
-```
-
-### Asynchronous Database Operations
-
-```java
-// Asynchronous query
-return database.queryFirstAsync(
-        "SELECT stat_value FROM stats WHERE player_id = ? AND stat_name = ?",
-        rs -> rs.getInt("stat_value"),
-        playerId, statName
-).thenApply(optional -> optional.orElse(0));
-
-// Asynchronous update
-return database.updateAsync(
-        "UPDATE players SET name = ?, last_seen = ?, playtime = ? WHERE uuid = ?",
-        playerData.getName(),
-        Timestamp.valueOf(playerData.getLastSeen()),
-        playerData.getPlaytime(),
-        playerData.getUuid().toString()
-).thenApply(rowsAffected -> rowsAffected > 0);
-```
-
-### Batch Operations
-
-```java
-// Batch update
-List<Object[]> batchParams = new ArrayList<>();
-for (Map.Entry<String, Integer> entry : playerData.getStats().entrySet()) {
-    batchParams.add(new Object[]{
-            playerId,
-            entry.getKey(),
-            entry.getValue(),
-            now,
-            playerId,
-            entry.getKey()
-    });
+// Example of finding a player by UUID
+public Optional<Player> findByUuid(UUID uuid) {
+    try {
+        return database.findByUuid(
+            "SELECT * FROM players WHERE uuid = ?",
+            playerMapper,
+            uuid
+        );
+    } catch (SQLException e) {
+        LogUtil.severe("Error finding player by UUID: " + e.getMessage());
+        return Optional.empty();
+    }
 }
 
-database.batchUpdate(
-        "INSERT INTO stats (player_id, stat_name, stat_value, last_updated) " +
-        "VALUES (?, ?, ?, ?) " +
-        "ON CONFLICT (player_id, stat_name) " +
-        "DO UPDATE SET stat_value = ?, last_updated = ?",
-        batchParams
-);
-```
-
-### Transactions
-
-```java
-database.executeTransaction(connection -> {
-    try (PreparedStatement stmt1 = connection.prepareStatement(
-            "INSERT INTO leaderboard_entries (leaderboard_id, player_id, rank, score, update_time) " +
-            "VALUES (?, ?, ?, ?, ?)")) {
-        // Transaction operations
-        
-        return true; // Commit transaction
+// Example of using the query builder
+public List<PlayerStats> getTopPlayers(String statName, int limit) {
+    try {
+        return database.select()
+            .columns("ps.*")
+            .from("player_stats ps")
+            .join("players p", "ps.player_id = p.id")
+            .orderBy("ps." + statName + " DESC")
+            .limit(limit)
+            .executeQuery(statsMapper);
+    } catch (SQLException e) {
+        LogUtil.severe("Error getting top players: " + e.getMessage());
+        return new ArrayList<>();
     }
-});
+}
 ```
 
-## Configuration
+## 🛠️ Contributing
 
-The plugin includes several configuration files:
+This plugin is intended as a reference implementation. If you find bugs or have suggestions for improvements, please open an issue or pull request on the GitHub repository.
 
-- `config.yml` - General plugin settings
-- `messages.yml` - Customizable messages
-- `achievements.yml` - Achievement definitions
+## 📜 License
 
-## Database Schema
-
-The plugin uses the following database tables:
-
-- `players` - Player information (UUID, name, join date, etc.)
-- `stats` - Player statistics
-- `achievements` - Achievement definitions
-- `player_achievements` - Tracks which players have earned which achievements
-- `leaderboards` - Leaderboard definitions
-- `leaderboard_entries` - Entries in leaderboards
-
-## Dependencies
-
-- Core-Utils - Service registry, commands, configuration, and utilities
-- SQL-Bridge - Database connectivity and operations
-- Spigot/Bukkit API - Minecraft server API
-
-## License
-
-This plugin is licensed under the MIT License.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.

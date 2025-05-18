@@ -1,113 +1,68 @@
 # ./Example-Plugin/src/main/resources/config.yml
-# PlayerStats Configuration
+# Example-Plugin Configuration
+# This configuration demonstrates the usage of Core-Utils configuration management
 
-# Debug mode - enables additional logging
-debug: false
-
-# Features
+# Plugin features
 features:
-  # Auto-track player statistics
-  auto-track-stats: true
+  # Enable or disable database integration (requires SQL-Bridge)
+  database_integration: true
   
-  # Display notifications for achievements
-  display-notifications: true
+  # Enable or disable stat tracking
+  stat_tracking: true
   
-  # Show welcome message on join
-  welcome-message: true
+  # Enable or disable achievements
+  achievements: true
   
-  # Show stats notification on join
-  join-stats: true
+  # Enable or disable admin tools
+  admin_tools: true
+
+# Statistics tracking settings
+statistics:
+  # Auto-save interval in seconds (set to 0 to disable auto-save)
+  save_interval: 300
+  
+  # Whether to track blocks broken
+  track_blocks_broken: true
+  
+  # Whether to track blocks placed
+  track_blocks_placed: true
+  
+  # Whether to track player kills
+  track_player_kills: true
+  
+  # Whether to track mob kills
+  track_mob_kills: true
+  
+  # Whether to track playtime
+  track_playtime: true
+  
+  # Whether to track distance traveled
+  track_distance: true
 
 # Achievement settings
 achievements:
-  # Check interval in seconds
-  check-interval: 20
+  # Whether to announce achievements to all players
+  announce_global: true
   
-  # Broadcast achievements to all players
-  broadcast: true
+  # Whether to play sound on achievement
+  play_sound: true
   
-  # Achievement rewards
-  rewards:
-    # Enable rewards
-    enabled: true
-    
-    # Default rewards for all achievements
-    default:
-      - "give {player} experience 100"
-    
-    # Specific rewards for achievements
-    list:
-      master_miner:
-        - "give {player} diamond 5"
-        - "give {player} experience 500"
-      combat_expert:
-        - "give {player} enchanted_book 1"
-        - "give {player} experience 500"
+  # Whether to show achievements in player's chat
+  show_in_chat: true
+  
+  # Whether to give rewards for achievements
+  enable_rewards: true
 
-# Leaderboard settings
-leaderboards:
-  # Update interval in minutes
-  update-interval: 30
+# Debug settings
+debug:
+  # Enable or disable debug mode
+  enabled: false
   
-  # Default leaderboards
-  default:
-    blocks_broken:
-      display-name: "Blocks Broken"
-      stat-name: "blocks.broken"
-      icon: "IRON_PICKAXE"
-      category: "blocks"
-    
-    combat_kills:
-      display-name: "Total Kills"
-      stat-name: "combat.kills"
-      icon: "DIAMOND_SWORD"
-      category: "combat"
-    
-    playtime:
-      display-name: "Playtime"
-      stat-name: "sessions.playtime"
-      icon: "CLOCK"
-      category: "general"
-
-# Performance settings
-performance:
-  # Cache expiry time in minutes
-  cache-expiry-time: 10
+  # Log level (0: OFF, 1: SEVERE, 2: WARNING, 3: INFO, 4: FINE, 5: ALL)
+  log_level: 3
   
-  # Cache flush interval in seconds
-  cache-flush-interval: 5
+  # Whether to log database operations
+  log_database: false
   
-  # Batch size for stat updates
-  stat-batch-size: 10
-  
-  # Batch interval in seconds
-  stat-batch-interval: 20
-  
-  # Auto-save stats immediately
-  auto-save-stats: false
-  
-  # Process stats immediately
-  immediate-stats: false
-
-# Stat display names
-stats:
-  display-names:
-    "blocks.broken": "Blocks Broken"
-    "blocks.placed": "Blocks Placed"
-    "combat.kills": "Kills"
-    "combat.deaths": "Deaths"
-    "combat.player_kills": "Player Kills"
-    "combat.damage_dealt": "Damage Dealt"
-    "combat.damage_taken": "Damage Taken"
-    "items.crafted": "Items Crafted"
-    "items.consumed": "Items Consumed"
-    "items.food_eaten": "Food Eaten"
-    "items.potions_drunk": "Potions Drunk"
-    "movement.distance": "Distance Traveled"
-    "movement.walking": "Distance Walked"
-    "movement.swimming": "Distance Swam"
-    "movement.flying": "Distance Flown"
-    "movement.gliding": "Distance Glided"
-    "sessions.count": "Sessions"
-    "sessions.playtime": "Playtime"
-    "fishing.caught": "Fish Caught"
+  # Whether to log service operations
+  log_services: false

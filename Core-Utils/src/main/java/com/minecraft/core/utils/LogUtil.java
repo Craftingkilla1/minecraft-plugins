@@ -1,3 +1,4 @@
+// ./Core-Utils/src/main/java/com/minecraft/core/utils/LogUtil.java
 package com.minecraft.core.utils;
 
 import org.bukkit.plugin.Plugin;
@@ -13,6 +14,7 @@ public class LogUtil {
     private static String prefix = "[CoreUtils] ";
     private static boolean debugMode = false;
     private static Plugin plugin;
+    private static Level logLevel = Level.INFO;
     
     private LogUtil() {
         // Private constructor to prevent instantiation
@@ -48,6 +50,24 @@ public class LogUtil {
         if (changed) {
             info("Debug mode " + (enabled ? "enabled" : "disabled"));
         }
+    }
+    
+    /**
+     * Set whether debug logging is enabled
+     * Alias for setDebugMode for backward compatibility
+     * @param enabled Whether debug logging is enabled
+     */
+    public static void setDebugEnabled(boolean enabled) {
+        setDebugMode(enabled);
+    }
+    
+    /**
+     * Set the log level
+     * @param level The log level
+     */
+    public static void setLogLevel(Level level) {
+        logLevel = level;
+        info("Log level set to: " + level.getName());
     }
     
     /**
@@ -125,11 +145,52 @@ public class LogUtil {
     }
     
     /**
+     * Log an info message with formatted string
+     * @param format The format string
+     * @param args The arguments
+     */
+    public static void info(String format, Object... args) {
+        if (logger != null) {
+            logger.info(String.format(format, args));
+        }
+    }
+    
+    /**
+     * Log a warning message with formatted string
+     * @param format The format string
+     * @param args The arguments
+     */
+    public static void warning(String format, Object... args) {
+        if (logger != null) {
+            logger.warning(String.format(format, args));
+        }
+    }
+    
+    /**
+     * Log a severe message with formatted string
+     * @param format The format string
+     * @param args The arguments
+     */
+    public static void severe(String format, Object... args) {
+        if (logger != null) {
+            logger.severe(String.format(format, args));
+        }
+    }
+    
+    /**
      * Check if debug mode is enabled
      * @return Whether debug mode is enabled
      */
     public static boolean isDebugMode() {
         return debugMode;
+    }
+    
+    /**
+     * Get the current log level
+     * @return The current log level
+     */
+    public static Level getLogLevel() {
+        return logLevel;
     }
     
     /**
@@ -178,11 +239,29 @@ public class LogUtil {
         }
         
         /**
+         * Set whether debug logging is enabled for this plugin
+         * Alias for setDebugMode for backward compatibility
+         * @param enabled Whether debug logging is enabled
+         */
+        public void setDebugEnabled(boolean enabled) {
+            this.pluginDebugMode = enabled;
+        }
+        
+        /**
          * Log an informational message
          * @param message The message to log
          */
         public void info(String message) {
             pluginLogger.info(message);
+        }
+        
+        /**
+         * Log an informational message with format
+         * @param format The format string
+         * @param args The arguments
+         */
+        public void info(String format, Object... args) {
+            pluginLogger.info(String.format(format, args));
         }
         
         /**
@@ -194,11 +273,29 @@ public class LogUtil {
         }
         
         /**
+         * Log a warning message with format
+         * @param format The format string
+         * @param args The arguments
+         */
+        public void warning(String format, Object... args) {
+            pluginLogger.warning(String.format(format, args));
+        }
+        
+        /**
          * Log a severe error message
          * @param message The message to log
          */
         public void severe(String message) {
             pluginLogger.severe(message);
+        }
+        
+        /**
+         * Log a severe error message with format
+         * @param format The format string
+         * @param args The arguments
+         */
+        public void severe(String format, Object... args) {
+            pluginLogger.severe(String.format(format, args));
         }
         
         /**
@@ -208,6 +305,17 @@ public class LogUtil {
         public void debug(String message) {
             if (pluginDebugMode) {
                 pluginLogger.log(Level.FINE, logPrefix + "[DEBUG] " + message);
+            }
+        }
+        
+        /**
+         * Log a debug message with format (only if debug mode is enabled)
+         * @param format The format string
+         * @param args The arguments
+         */
+        public void debug(String format, Object... args) {
+            if (pluginDebugMode) {
+                pluginLogger.log(Level.FINE, logPrefix + "[DEBUG] " + String.format(format, args));
             }
         }
         

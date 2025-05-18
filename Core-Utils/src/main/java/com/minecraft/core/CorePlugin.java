@@ -1,5 +1,6 @@
 package com.minecraft.core;
 
+import com.minecraft.core.api.CoreAPI;
 import com.minecraft.core.api.service.ServiceRegistry;
 import com.minecraft.core.command.CommandRegistry;
 import com.minecraft.core.command.CoreAdminCommand;
@@ -56,6 +57,9 @@ public class CorePlugin extends JavaPlugin {
         
         // Register event handlers
         registerEventHandlers();
+        
+        // Initialize Core API
+        CoreAPI.init(this);
         
         LogUtil.info("Core-Utils plugin v" + getDescription().getVersion() + " enabled successfully");
     }

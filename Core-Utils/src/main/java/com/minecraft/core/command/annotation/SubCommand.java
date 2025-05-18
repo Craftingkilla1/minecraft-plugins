@@ -1,3 +1,4 @@
+// ./Core-Utils/src/main/java/com/minecraft/core/command/annotation/SubCommand.java
 package com.minecraft.core.command.annotation;
 
 import java.lang.annotation.ElementType;
@@ -13,8 +14,9 @@ import java.lang.annotation.Target;
 public @interface SubCommand {
     /**
      * The name of the subcommand
+     * Use an empty string for the default command (invoked when no subcommand is provided)
      */
-    String name();
+    String name() default "";
     
     /**
      * The description of the subcommand
@@ -46,4 +48,9 @@ public @interface SubCommand {
      * Set to -1 for unlimited arguments
      */
     int maxArgs() default -1;
+    
+    /**
+     * Whether this is the default subcommand (invoked when no subcommand is provided)
+     */
+    boolean isDefault() default false;
 }

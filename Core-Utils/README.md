@@ -1,3 +1,4 @@
+// ./Core-Utils/README.md
 # Core-Utils Developer Documentation
 
 ## Table of Contents
@@ -14,6 +15,7 @@
 4. [Command Framework](#command-framework)
    - [Creating Commands](#creating-commands)
    - [Command Annotations](#command-annotations)
+   - [Default Commands](#default-commands)
    - [Registering Commands](#registering-commands)
    - [Tab Completion](#tab-completion)
 5. [Configuration Management](#configuration-management)
@@ -25,8 +27,12 @@
    - [InventoryUtil](#inventoryutil)
    - [FormatUtil](#formatutil)
    - [BungeeUtils](#bungeeutils)
-7. [Best Practices](#best-practices)
-8. [Example Plugin](#example-plugin)
+7. [Common Issues and Solutions](#common-issues-and-solutions)
+   - [Type Import Conflicts](#type-import-conflicts)
+   - [Java Version Compatibility](#java-version-compatibility)
+   - [Method Signature Alternatives](#method-signature-alternatives)
+8. [Best Practices](#best-practices)
+9. [Example Plugin](#example-plugin)
 
 ## Introduction
 
@@ -361,16 +367,44 @@ public class YourCommand implements TabCompletionProvider {
   - `aliases`: Alternative command names
   
 - **@SubCommand**: Method-level annotation for subcommands
-  - `name`: The subcommand name (required)
+  - `name`: The subcommand name (required unless isDefault=true)
   - `description`: Subcommand description
   - `permission`: Permission node required
   - `aliases`: Alternative subcommand names
   - `minArgs`: Minimum number of arguments required
   - `maxArgs`: Maximum number of arguments allowed (-1 for unlimited)
+  - `isDefault`: Whether this is the default subcommand (invoked when no subcommand name is provided)
   
 - **@Permission**: Can be applied to classes or methods
   - `value`: The permission node required
   - `message`: Custom message when permission is denied
+
+### Default Commands
+
+You can define a default command that is executed when no subcommand is specified:
+
+```java
+@Command(name = "yourcommand", description = "Your command description")
+public class YourCommand {
+
+    // This will be executed when the user types just "/yourcommand" with no subcommand
+    @SubCommand(isDefault = true, description = "Default command")
+    public void defaultCommand(CommandSender sender, String[] args) {
+        sender.sendMessage(ChatColor.GREEN + "This is the default command!");
+    }
+    
+    // Other subcommands...
+}
+```
+
+Or using an empty name (which automatically sets isDefault):
+
+```java
+@SubCommand(name = "", description = "Default command")
+public void defaultCommand(CommandSender sender, String[] args) {
+    sender.sendMessage(ChatColor.GREEN + "This is the default command!");
+}
+```
 
 ### Registering Commands
 
@@ -440,14 +474,24 @@ boolean enabled = config.getBoolean("feature.enabled", false);
 
 ### Using the Messages System
 
+The Messages system provides several constructors to accommodate different needs:
+
 ```java
 import com.minecraft.core.config.Messages;
+import org.bukkit.configuration.file.YamlConfiguration;
 
-// Option 1: Using CoreAPI
-Messages messages = CoreAPI.getMessages();
+// Option 1: Default messages file (messages.yml)
+Messages messages = new Messages(plugin);
 
-// Option 2: Create a messages instance
-Messages messages = configManager.createMessages();
+// Option 2: Custom messages file name
+Messages messages = new Messages(plugin, "custom-messages");
+
+// Option 3: Use a pre-loaded configuration
+YamlConfiguration messagesConfig = YamlConfiguration.loadConfiguration(messagesFile);
+Messages messages = new Messages(plugin, messagesConfig);
+
+// Option 4: Use a pre-loaded configuration with custom prefix
+Messages messages = new Messages(plugin, messagesConfig, "&8[&bCustom&8] &r");
 
 // Send messages to players
 messages.sendMessage(player, "welcome");
@@ -461,6 +505,9 @@ Map<String, String> replacements = new HashMap<>();
 replacements.put("player", player.getName());
 replacements.put("item", "Diamond Sword");
 String message = messages.getFormattedMessage("message.key", replacements);
+
+// Get the underlying configuration if needed
+FileConfiguration messagesConfig = messages.getConfig();
 ```
 
 ## Utility Classes
@@ -481,12 +528,22 @@ LogUtil.warning("This is a warning message");
 LogUtil.severe("This is a severe error message");
 LogUtil.debug("This is a debug message (only shown if debug mode is enabled)");
 
-// Formatting
-LogUtil.format("Player %s connected from %s", player.getName(), address);
+// Format string logging (new in v1.1.0)
+LogUtil.info("Player %s connected from %s", player.getName(), address);
+LogUtil.warning("Failed to load file: %s", fileName);
+LogUtil.severe("Exception in %s: %s", "TaskManager", e.getMessage());
+
+// Setting debug mode
+LogUtil.setDebugMode(true);  // Preferred method
+LogUtil.setDebugEnabled(true);  // Alternative method (added for compatibility)
+
+// Setting log level
+LogUtil.setLogLevel(Level.FINE);
 
 // Per-plugin logging
 LogUtil.PluginLogger logger = LogUtil.forPlugin(yourPlugin, "[YourPlugin] ");
 logger.info("This is a plugin-specific message");
+logger.info("Player %s connected from %s", player.getName(), address);
 ```
 
 ### TimeUtil
@@ -530,6 +587,9 @@ ItemStack head = InventoryUtil.createPlayerHead(player,
 // Make an item glow
 ItemStack glowing = InventoryUtil.makeGlow(item);
 
+// Create an inventory (new in v1.1.0)
+Inventory inventory = InventoryUtil.createInventory(null, 54, "&8Example Inventory");
+
 // Fill inventory
 InventoryUtil.fillEmptySlots(inventory, 
     InventoryUtil.createDivider(Material.BLACK_STAINED_GLASS_PANE));
@@ -548,6 +608,18 @@ Inventory confirmMenu = InventoryUtil.createConfirmationMenu(
     player -> {
         // Action when No is clicked
         player.sendMessage("Purchase cancelled!");
+    }
+);
+
+// Create a confirmation inventory with message (new in v1.1.0)
+Inventory confirmInventory = InventoryUtil.createConfirmationInventory(
+    "&8Confirm Delete",
+    "&cAre you sure you want to delete this item?",
+    player -> {
+        player.sendMessage("Item deleted!");
+    },
+    player -> {
+        player.sendMessage("Delete cancelled!");
     }
 );
 ```
@@ -597,6 +669,83 @@ bungeeUtils.getPlayerCount("survival", count -> {
 });
 ```
 
+## Common Issues and Solutions
+
+### Type Import Conflicts
+
+When you have classes with the same name from different packages, you need to use fully qualified names to avoid conflicts:
+
+```java
+// Instead of importing both classes
+import org.bukkit.entity.Player;
+import com.minecraft.example.sql.models.Player;  // This will cause a conflict
+
+// Do this:
+import org.bukkit.entity.Player;  // Import only one
+
+// And use fully qualified name for the other
+com.minecraft.example.sql.models.Player playerModel = new com.minecraft.example.sql.models.Player();
+```
+
+Alternatively, you can use an import alias (Java 10+):
+
+```java
+import org.bukkit.entity.Player;
+import com.minecraft.example.sql.models.Player as ModelPlayer;
+
+ModelPlayer playerModel = new ModelPlayer();
+```
+
+In Java 8, consider renaming your model classes to avoid conflicts:
+
+```java
+// Rename your model class
+public class PlayerModel {  // Instead of just "Player"
+    // ...
+}
+```
+
+### Java Version Compatibility
+
+Core-Utils is built with Java 8 compatibility in mind. Avoid using Java 9+ features like:
+
+```java
+// Java 9+ feature (not compatible)
+Map<String, String> map = Map.of("key1", "value1", "key2", "value2");
+
+// Use this instead (Java 8 compatible)
+Map<String, String> map = new HashMap<>();
+map.put("key1", "value1");
+map.put("key2", "value2");
+```
+
+For immutable collections, use Guava or other libraries compatible with Java 8:
+
+```java
+// Using Guava
+import com.google.common.collect.ImmutableMap;
+
+Map<String, String> map = ImmutableMap.of("key1", "value1", "key2", "value2");
+```
+
+### Method Signature Alternatives
+
+Some methods have multiple overloads for flexibility:
+
+```java
+// LogUtil has both simple and format string versions
+LogUtil.info("A simple message");
+LogUtil.info("Player %s joined from %s", playerName, address);
+
+// InventoryUtil has multiple ways to create items
+ItemStack item1 = InventoryUtil.createItem(Material.DIAMOND_SWORD, "&6Special Sword", "&7Very special");
+ItemStack item2 = InventoryUtil.createItem(Material.DIAMOND_SWORD, "&6Special Sword", Arrays.asList("&7Very special", "&8Rare"));
+
+// Messages system offers multiple constructors
+Messages messages1 = new Messages(plugin);
+Messages messages2 = new Messages(plugin, messagesConfig);
+```
+
 ## Best Practices
 
 1. **Use CoreAPI**: Always use the CoreAPI class for accessing Core-Utils features. It provides a clean, centralized interface.
@@ -644,6 +793,10 @@ if (service == null) {
 7. **Consistent Command Structure**: Use a consistent command structure across all your plugins.
 
 8. **Use Debug Mode Appropriately**: Use `LogUtil.debug()` for debugging information, not for regular logging.
+
+9. **Avoid Class Name Conflicts**: Use distinct class names or fully qualified names to avoid conflicts.
+
+10. **Maintain Java 8 Compatibility**: Avoid using Java 9+ features to ensure compatibility with all servers.
 
 ## Example Plugin
 

@@ -56,6 +56,51 @@ public class Messages {
     }
     
     /**
+     * Create a new messages instance with a pre-loaded config
+     * 
+     * @param plugin The plugin instance
+     * @param config The pre-loaded configuration
+     * @param customPrefix Custom prefix to use (can be null for default)
+     */
+    public Messages(Plugin plugin, FileConfiguration config, String customPrefix) {
+        this.plugin = plugin;
+        this.messagesFile = new File(plugin.getDataFolder(), "messages.yml");
+        this.config = config;
+        
+        if (customPrefix != null) {
+            this.prefix = customPrefix;
+        }
+        
+        // Load prefixes from config if available
+        if (config.contains("prefixes.default")) {
+            prefix = config.getString("prefixes.default", prefix);
+        }
+        if (config.contains("prefixes.error")) {
+            errorPrefix = config.getString("prefixes.error", errorPrefix);
+        }
+        if (config.contains("prefixes.success")) {
+            successPrefix = config.getString("prefixes.success", successPrefix);
+        }
+        
+        // Cache commonly used messages
+        for (String key : config.getKeys(true)) {
+            if (config.isString(key)) {
+                messageCache.put(key, config.getString(key));
+            }
+        }
+    }
+    
+    /**
+     * Create a new messages instance with a pre-loaded config file
+     * 
+     * @param plugin The plugin instance
+     * @param messagesConfig The pre-loaded configuration
+     */
+    public Messages(Plugin plugin, YamlConfiguration messagesConfig) {
+        this(plugin, messagesConfig, null);
+    }
+    
+    /**
      * Create the default messages file if it doesn't exist
      */
     private void createDefaultMessages() {
@@ -79,6 +124,11 @@ public class Messages {
      * Load messages from the configuration
      */
     public void loadMessages() {
+        // Skip if we already have a config (from constructor with pre-loaded config)
+        if (config != null) {
+            return;
+        }
+        
         // Clear cache first
         messageCache.clear();
         
@@ -393,5 +443,14 @@ public class Messages {
      */
     public String getSuccessPrefix() {
         return successPrefix;
+    }
+    
+    /**
+     * Get the underlying configuration
+     * 
+     * @return The configuration
+     */
+    public FileConfiguration getConfig() {
+        return config;
     }
 }

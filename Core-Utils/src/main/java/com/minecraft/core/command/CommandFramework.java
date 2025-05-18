@@ -1,3 +1,4 @@
+// ./Core-Utils/src/main/java/com/minecraft/core/command/CommandFramework.java
 package com.minecraft.core.command;
 
 import com.minecraft.core.command.annotation.Command;
@@ -93,6 +94,13 @@ public class CommandFramework {
         SubCommand subCommandAnnotation = method.getAnnotation(SubCommand.class);
         String subCommandName = subCommandAnnotation.name();
         
+        // Support default subcommand
+        if (subCommandName.isEmpty() && !subCommandAnnotation.isDefault()) {
+            LogUtil.warning("SubCommand name cannot be empty unless isDefault=true: " + method.getName() + 
+                          " in " + method.getDeclaringClass().getName());
+            return;
+        }
+        
         // Validate method signature
         Class<?>[] paramTypes = method.getParameterTypes();
         if (paramTypes.length != 2 || 
@@ -107,7 +115,12 @@ public class CommandFramework {
         
         // Register the subcommand
         handler.registerSubCommand(subCommandName, method, subCommandAnnotation);
-        LogUtil.debug("Registered subcommand: " + subCommandName + " for command: " + handler.getCommandName());
+        
+        if (subCommandAnnotation.isDefault() || subCommandName.isEmpty()) {
+            LogUtil.debug("Registered default subcommand for command: " + handler.getCommandName());
+        } else {
+            LogUtil.debug("Registered subcommand: " + subCommandName + " for command: " + handler.getCommandName());
+        }
     }
     
     /**

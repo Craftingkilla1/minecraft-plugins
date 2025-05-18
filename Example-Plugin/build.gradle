@@ -4,45 +4,81 @@ plugins {
     id 'com.github.johnrengelman.shadow'
 }
 
-description = 'Example plugin demonstrating CoreUtils and Sql-Bridge functionality'
+description = 'Reference implementation demonstrating Core-Utils and Sql-Bridge functionality'
+version = '1.0.0'
 
 dependencies {
-    // Spigot API
+    // Core dependencies
     compileOnly "org.spigotmc:spigot-api:${rootProject.ext.minecraftVersion}"
     
-    // Core-Utils dependency
+    // Project dependencies
     compileOnly project(':Core-Utils')
-    
-    // SQL-Bridge dependency
     compileOnly project(':Sql-Bridge')
     
-    // Lombok for reducing boilerplate
+    // Lombok for reducing boilerplate code
     compileOnly "org.projectlombok:lombok:${rootProject.ext.lombokVersion}"
     annotationProcessor "org.projectlombok:lombok:${rootProject.ext.lombokVersion}"
     
-    // Testing dependencies inherited from root project
+    // Testing dependencies
+    testImplementation "org.junit.jupiter:junit-jupiter-api:${rootProject.ext.junitVersion}"
+    testRuntimeOnly "org.junit.jupiter:junit-jupiter-engine:${rootProject.ext.junitVersion}"
+    testImplementation "org.mockito:mockito-core:${rootProject.ext.mockitoVersion}"
 }
 
-// Process plugin.yml on build to insert version
-processResources {
-    expand(
-        'version': project.version,
-        'name': project.name
-    )
-}
-
-// Configure JAR and Shadow JAR
-jar {
-    archiveBaseName.set('PlayerStats')
-}
-
+// Configure shadowJar to include required dependencies
 shadowJar {
-    archiveBaseName.set('PlayerStats')
+    // We don't need to include Core-Utils or Sql-Bridge in our JAR
+    // as they're provided separately
     
-    // Relocate dependencies if needed
-    // relocate 'com.example.dependency', 'com.minecraft.example.dependency'
+    // Relocate any shared dependencies to avoid conflicts
+    relocate 'org.apache.commons', 'com.minecraft.example.shaded.commons'
+    
+    // Choose which dependencies to include (if any)
+    // dependencies {
+    //    include(dependency('some:dependency:1.0.0'))
+    // }
+    
+    // Make sure plugin.yml has the correct name attribute
+    archiveBaseName.set(project.name)
 }
 
-build {
-    dependsOn shadowJar
+processResources {
+    // Replace version in plugin.yml
+    filesMatching('plugin.yml') {
+        expand(
+            'version': project.version,
+            'name': project.name
+        )
+    }
+    
+    // Make sure achievements directory is included
+    from(sourceSets.main.resources.srcDirs) {
+        include 'achievements/**'
+    }
+}
+
+// Copy default.yml to the right location if it doesn't exist yet
+task copyAchievements(type: Copy) {
+    from 'src/main/resources/achievements/default.yml'
+    into 'build/resources/main/achievements'
+}
+
+processResources.dependsOn copyAchievements
+
+// Add resources directory structure to build if it doesn't exist
+task createResourceDirs {
+    doLast {
+        mkdir "src/main/resources/achievements"
+    }
+}
+
+// Run this task first
+processResources.dependsOn createResourceDirs
+
+// Make sure our jar task depends on shadowJar
+jar.dependsOn shadowJar
+
+// Configure test task
+test {
+    useJUnitPlatform()
 }

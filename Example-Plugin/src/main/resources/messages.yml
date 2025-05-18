@@ -1,56 +1,101 @@
 # ./Example-Plugin/src/main/resources/messages.yml
-# PlayerStats Messages Configuration
+# Example-Plugin Messages
+# This demonstrates using the Core-Utils messages system
 
-# General messages
-welcome: "&a&lWelcome to PlayerStats! &7Track your progress and earn achievements!"
-prefix: "&8[&6PlayerStats&8] &r"
-plugin-reload: "&aPlayerStats configuration reloaded."
-database-connected: "&aSuccessfully connected to the database."
-database-error: "&cDatabase connection error: {error}"
+prefix: "&8[&bExample&8] &r"
 
-# Command messages
+# General plugin messages
+plugin:
+  enabled: "&aExample-Plugin has been enabled."
+  disabled: "&cExample-Plugin has been disabled."
+  reloaded: "&aConfiguration reloaded successfully."
+  no_permission: "&cYou don't have permission to use this command."
+  player_only: "&cThis command can only be used by players."
+  unknown_command: "&cUnknown command. Use '/example help' for a list of commands."
+  unknown_player: "&cPlayer '{player}' not found."
+  feature_disabled: "&cThis feature is currently disabled."
+  database_disabled: "&cDatabase features are currently disabled."
+
+# Command related messages
 commands:
-  player-only: "&cThis command can only be used by players."
-  player-required: "&cYou must specify a player name."
-  player-not-found: "&cPlayer &e{player} &cnot found or offline."
-  no-permission: "&cYou don't have permission to use this command."
-  invalid-number: "&c{input} is not a valid number."
-  invalid-stat: "&c{stat} is not a valid statistic."
+  help:
+    header: "&8=== &bExample-Plugin Help &8==="
+    footer: "&8==========================="
+    format: "&b/{command} &7- {description}"
+  example:
+    info: "&7Version: &b{version}&7, Author: &b{author}"
+    help: "&7Use &b/example help &7for a list of commands."
+  stats:
+    header: "&8=== &b{player}'s Statistics &8==="
+    footer: "&8==========================="
+    format: "&7{stat}: &b{value}"
+    reset: "&aReset statistics for {player}."
+    not_found: "&cNo statistics found for {player}."
+  achievements:
+    header: "&8=== &b{player}'s Achievements &8==="
+    footer: "&8==========================="
+    format: "&7{achievement}: &b{description}"
+    awarded: "&aAwarded achievement '{achievement}' to {player}."
+    already_has: "&c{player} already has this achievement."
+    not_found: "&cNo achievements found for {player}."
 
-# Stats messages
+# Stats related messages
 stats:
-  no-stats: "&e{player} &7has no recorded statistics."
-  no-stats-compare: "&cCannot compare statistics. One or both players have no recorded stats."
-  no-stats-for: "&cNo statistics found for &e{stat}&c."
-  compare-self: "&cYou cannot compare stats with yourself."
-  join-stats: "&7You have played &e{sessions} &7sessions on this server."
-  reset: "&aStatistics for &e{player} &ahave been reset."
-  reset-specific: "&aStat &e{stat} &ahas been reset for &e{player}&a."
-  modified: "&aStat &e{stat} &afor &e{player} &ahas been set to &e{value}&a."
+  blocks_broken: "Blocks Broken"
+  blocks_placed: "Blocks Placed"
+  player_kills: "Player Kills"
+  mob_kills: "Mob Kills"
+  deaths: "Deaths"
+  playtime: "Playtime"
+  distance_traveled: "Distance Traveled"
+  saved: "&aYour statistics have been saved."
+  updated: "&aYour {stat} statistic has been updated to {value}."
 
-# Achievement messages
+# Achievement related messages
 achievements:
-  earned: "&a&lAchievement Unlocked: &e{name}"
-  earned-secret: "&a&lSecret Achievement Unlocked: &e{name}"
-  broadcast: "&e{player} &ahas earned the achievement &e{name}&a!"
-  no-achievements: "&e{player} &7has not earned any achievements yet."
-  reset: "&aAchievements for &e{player} &ahave been reset."
-  progress: "&7Progress for &e{name}&7: &a{progress}%"
-
-# Leaderboard messages
-leaderboard:
-  no-entries: "&cNo entries found for leaderboard &e{name}&c."
-  created: "&aLeaderboard &e{name} &acreated successfully."
-  deleted: "&aLeaderboard &e{name} &adeleted successfully."
-  updated: "&aLeaderboard &e{name} &aupdated successfully."
-  header: "&a&lTop {limit} Players - {name}"
-  entry: "&e#{rank} &7{player}: &f{value}"
-  player-rank: "&7Your rank: &e#{rank} &7with &f{value}"
-  not-ranked: "&7You are not currently ranked on this leaderboard."
+  unlocked: "&aYou unlocked the achievement: &b{achievement}&a!"
+  global_announce: "&a{player} unlocked the achievement: &b{achievement}&a!"
+  # Achievement names
+  first_join:
+    name: "First Steps"
+    description: "Join the server for the first time"
+  blocks_broken_100:
+    name: "Demolition Expert"
+    description: "Break 100 blocks"
+  blocks_broken_1000:
+    name: "Block Destroyer"
+    description: "Break 1,000 blocks"
+  blocks_placed_100:
+    name: "Constructor"
+    description: "Place 100 blocks"
+  blocks_placed_1000:
+    name: "Master Builder"
+    description: "Place 1,000 blocks"
+  player_kills_10:
+    name: "PvP Novice"
+    description: "Defeat 10 players"
+  mob_kills_100:
+    name: "Monster Hunter"
+    description: "Defeat 100 mobs"
+  playtime_1_hour:
+    name: "Dedicated"
+    description: "Play for 1 hour"
+  playtime_10_hours:
+    name: "Veteran"
+    description: "Play for 10 hours"
+  distance_1_km:
+    name: "Explorer"
+    description: "Travel 1 kilometer"
+  distance_10_km:
+    name: "Globe Trotter"
+    description: "Travel 10 kilometers"
 
 # Error messages
 errors:
-  database-init: "&cFailed to initialize database: {error}"
-  service-not-found: "&cRequired service not available: {service}"
-  general: "&cAn error occurred: {error}"
-  command-usage: "&cUsage: {usage}"
+  database:
+    connection: "&cCould not connect to the database: {message}"
+    query: "&cDatabase query error: {message}"
+    update: "&cDatabase update error: {message}"
+  service:
+    not_found: "&cRequired service not found: {service}"
+    registration: "&cCould not register service: {service}"

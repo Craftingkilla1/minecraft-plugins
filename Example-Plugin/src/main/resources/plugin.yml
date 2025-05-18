@@ -1,42 +1,55 @@
 # ./Example-Plugin/src/main/resources/plugin.yml
-name: PlayerStats
+name: Example-Plugin
 version: '${version}'
-main: com.minecraft.example.PlayerStatsPlugin
+main: com.minecraft.example.ExamplePlugin
 api-version: '1.16'
-depend: [CoreUtils, Sql-Bridge]
-description: Example plugin demonstrating CoreUtils and Sql-Bridge functionality
-author: Craftingkilla1
-website: https://github.com/Craftingkilla1/minecraft-plugins
-
+authors: [Minecraft-Plugins-Team]
+description: Example plugin demonstrating Core-Utils and SQL-Bridge functionality
+depend: [Core-Utils]
+softdepend: [Sql-Bridge]
 commands:
+  example:
+    description: Main command for Example-Plugin
+    usage: /example <subcommand> [args]
+    aliases: [exp, exampleplugin]
+    permission: exampleplugin.use
   stats:
-    description: View player statistics
-    usage: /stats [player]
+    description: View and manage player statistics
+    usage: /stats <subcommand> [args]
     aliases: [playerstats, pstats]
-  
-  admin:
-    description: Administrative commands for PlayerStats
-    usage: /admin <reset|modify|maintenance> [options]
-    permission: playerstats.admin
-  
-  leaderboard:
-    description: View server leaderboards
-    usage: /leaderboard [category]
-    aliases: [top, lb]
-
+    permission: exampleplugin.stats
+  achievements:
+    description: View and manage player achievements
+    usage: /achievements <subcommand> [args]
+    aliases: [achieve, ach]
+    permission: exampleplugin.achievements
 permissions:
-  playerstats.admin:
-    description: Allows access to administrative commands
+  exampleplugin.use:
+    description: Allows use of basic Example-Plugin commands
+    default: true
+  exampleplugin.stats:
+    description: Allows use of stats commands
+    default: true
+  exampleplugin.stats.others:
+    description: Allows viewing stats of other players
     default: op
-  
-  playerstats.view.others:
-    description: Allows viewing other players' statistics
+  exampleplugin.stats.reset:
+    description: Allows resetting player stats
     default: op
-  
-  playerstats.reset:
-    description: Allows resetting player statistics
+  exampleplugin.achievements:
+    description: Allows use of achievement commands
+    default: true
+  exampleplugin.achievements.others:
+    description: Allows viewing achievements of other players
     default: op
-    
-  playerstats.modify:
-    description: Allows modifying player statistics
+  exampleplugin.achievements.award:
+    description: Allows manually awarding achievements to players
     default: op
+  exampleplugin.admin:
+    description: Provides access to all admin commands
+    default: op
+    children:
+      exampleplugin.stats.reset: true
+      exampleplugin.stats.others: true
+      exampleplugin.achievements.others: true
+      exampleplugin.achievements.award: true
