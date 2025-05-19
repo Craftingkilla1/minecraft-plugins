@@ -1,4 +1,3 @@
-// ./Core-Utils/README.md
 # Core-Utils Developer Documentation
 
 ## Table of Contents
@@ -6,7 +5,7 @@
 2. [Getting Started](#getting-started)
    - [Project Setup](#project-setup)
    - [Adding Core-Utils as a Dependency](#adding-core-utils-as-a-dependency)
-   - [Quick Start with CoreAPI](#quick-start-with-coreapi)
+   - [Quick Start](#quick-start)
 3. [Service Registry System](#service-registry-system)
    - [Creating a Service](#creating-a-service)
    - [Registering a Service](#registering-a-service)
@@ -30,7 +29,6 @@
 7. [Common Issues and Solutions](#common-issues-and-solutions)
    - [Type Import Conflicts](#type-import-conflicts)
    - [Java Version Compatibility](#java-version-compatibility)
-   - [Method Signature Alternatives](#method-signature-alternatives)
 8. [Best Practices](#best-practices)
 9. [Example Plugin](#example-plugin)
 
@@ -86,17 +84,27 @@ repositories {
     // Spigot repository
     maven { url = 'https://hub.spigotmc.org/nexus/content/repositories/snapshots/' }
     // Core-Utils repository (if used)
-    maven { url = uri('../Core-Utils/build/repo') }
+    maven { url = uri('../build/repo') }
 }
 
 dependencies {
     // Bukkit/Spigot API
     compileOnly 'org.spigotmc:spigot-api:1.16.5-R0.1-SNAPSHOT'
     
-    // Core-Utils dependency
-    compileOnly 'com.minecraft:core-utils:1.0.0'
+    // Option 1: For standalone projects - use version range to get latest compatible version
+    compileOnly 'com.minecraft:core-utils:1.+'  // Any 1.x version
+    
+    // Option 2: For standalone projects - define version in gradle.properties
+    // compileOnly "com.minecraft:core-utils:${coreUtilsVersion}"
+    
+    // Option 3: For multi-module projects - direct project reference
+    // compileOnly project(':Core-Utils')
 }
 ```
+
+> **Note:** For Option 2, create a `gradle.properties` file with `coreUtilsVersion=1.0.9` or the current version.
+> This allows easier updating of dependencies across your project.
+
 
 #### Using Maven
 
@@ -116,11 +124,15 @@ In your `pom.xml` file:
     <dependency>
         <groupId>com.minecraft</groupId>
         <artifactId>core-utils</artifactId>
-        <version>1.0.0</version>
+        <version>[1.0,2.0)</version> <!-- Use version range to get latest 1.x version -->
         <scope>provided</scope>
     </dependency>
 </dependencies>
 ```
+
+> **Note:** The version range `[1.0,2.0)` means "any version from 1.0 (inclusive) to 2.0 (exclusive)".
+> This ensures you always get the latest compatible version of Core-Utils.
+
 
 #### plugin.yml
 
@@ -134,12 +146,15 @@ api-version: '1.16'
 depend: [CoreUtils]
 ```
 
-### Quick Start with CoreAPI
+### Quick Start
 
-CoreAPI is a centralized access point for all Core-Utils features. It makes it easy to use the framework in your plugins:
+Here's a basic setup for a plugin that uses Core-Utils. There are two main approaches:
+
+#### Approach 1: Using CoreAPI (Recommended)
 
 ```java
 import com.minecraft.core.api.CoreAPI;
+import com.minecraft.core.utils.LogUtil;
 import org.bukkit.plugin.java.JavaPlugin;
 
 public class YourPlugin extends JavaPlugin {
@@ -147,15 +162,20 @@ public class YourPlugin extends JavaPlugin {
     @Override
     public void onEnable() {
         // Initialize logging
-        CoreAPI.Utils.initLogging(this);
+        LogUtil.init(this);
+        
+        // Check if Core-Utils is available
+        if (!checkCoreUtilsAvailable()) {
+            return;
+        }
         
         // Register commands
-        CoreAPI.Commands.register(new YourCommand());
+        CoreAPI.Commands.register(new YourCommand(this));
         
         // Register a service
         CoreAPI.Services.register(YourService.class, new YourServiceImpl());
         
-        getLogger().info("Your plugin enabled successfully!");
+        LogUtil.info("Your plugin enabled successfully!");
     }
     
     @Override
@@ -163,10 +183,67 @@ public class YourPlugin extends JavaPlugin {
         // Unregister services
         CoreAPI.Services.unregister(YourService.class);
         
-        getLogger().info("Your plugin disabled successfully!");
+        LogUtil.info("Your plugin disabled successfully!");
+    }
+    
+    private boolean checkCoreUtilsAvailable() {
+        try {
+            Class.forName("com.minecraft.core.api.CoreAPI");
+            return true;
+        } catch (ClassNotFoundException e) {
+            getLogger().severe("Core-Utils not found! This plugin requires Core-Utils to function.");
+            getServer().getPluginManager().disablePlugin(this);
+            return false;
+        }
     }
 }
 ```
+
+#### Approach 2: Using Direct Core-Utils Classes
+
+```java
+import com.minecraft.core.CorePlugin;
+import com.minecraft.core.api.service.ServiceRegistry;
+import com.minecraft.core.command.CommandRegistry;
+import com.minecraft.core.utils.LogUtil;
+import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.plugin.Plugin;
+
+public class YourPlugin extends JavaPlugin {
+    
+    @Override
+    public void onEnable() {
+        // Initialize logging
+        LogUtil.init(this);
+        
+        // Check for Core-Utils
+        Plugin corePlugin = getServer().getPluginManager().getPlugin("CoreUtils");
+        if (!(corePlugin instanceof CorePlugin)) {
+            LogUtil.severe("CoreUtils not found! This plugin requires CoreUtils to function.");
+            getServer().getPluginManager().disablePlugin(this);
+            return;
+        }
+        
+        // Register commands
+        CommandRegistry commandRegistry = ((CorePlugin) corePlugin).getCommandRegistry();
+        commandRegistry.registerCommand(new YourCommand(this));
+        
+        // Register a service
+        ServiceRegistry.register(YourService.class, new YourServiceImpl(this));
+        
+        LogUtil.info("Your plugin enabled successfully!");
+    }
+    
+    @Override
+    public void onDisable() {
+        // Unregister services
+        ServiceRegistry.unregister(YourService.class);
+        
+        LogUtil.info("Your plugin disabled successfully!");
+    }
+}
+```
+
 
 ## Service Registry System
 
@@ -212,18 +289,6 @@ public class DefaultYourService implements YourService {
 
 ### Registering a Service
 
-Using CoreAPI (recommended):
-
-```java
-// Create the service implementation
-YourService service = new DefaultYourService(this);
-
-// Register the service with the registry
-CoreAPI.Services.register(YourService.class, service);
-```
-
-Using ServiceRegistry directly:
-
 ```java
 import com.minecraft.core.api.service.ServiceRegistry;
 
@@ -240,28 +305,6 @@ public void onEnable() {
 ```
 
 ### Consuming a Service
-
-Using CoreAPI (recommended):
-
-```java
-// Option 1: Get service, check if it exists
-YourService service = CoreAPI.Services.get(YourService.class);
-if (service != null) {
-    // Use the service
-    String result = service.performTask("hello");
-}
-
-// Option 2: Require service (throws exception if not found)
-try {
-    YourService service = CoreAPI.Services.require(YourService.class);
-    // Use the service
-    String result = service.performTask("hello");
-} catch (ServiceLocator.ServiceNotFoundException e) {
-    getLogger().warning("Required service not found: " + e.getMessage());
-}
-```
-
-Using ServiceLocator directly:
 
 ```java
 import com.minecraft.core.api.service.ServiceLocator;
@@ -292,7 +335,7 @@ Services should be registered during your plugin's `onEnable()` method and unreg
 @Override
 public void onDisable() {
     // Unregister the service
-    CoreAPI.Services.unregister(YourService.class);
+    ServiceRegistry.unregister(YourService.class);
     
     // Other cleanup...
 }
@@ -315,6 +358,10 @@ import com.minecraft.core.command.TabCompletionProvider;
 import org.bukkit.ChatColor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
 @Command(name = "yourcommand", description = "Your command description", aliases = {"yc"})
 public class YourCommand implements TabCompletionProvider {
@@ -408,18 +455,6 @@ public void defaultCommand(CommandSender sender, String[] args) {
 
 ### Registering Commands
 
-With CoreAPI (recommended):
-
-```java
-// Create your command
-YourCommand yourCommand = new YourCommand(this);
-
-// Register your command
-CoreAPI.Commands.register(yourCommand);
-```
-
-With CommandRegistry directly:
-
 ```java
 import com.minecraft.core.CorePlugin;
 import com.minecraft.core.command.CommandRegistry;
@@ -453,11 +488,10 @@ Core-Utils provides tools for managing plugin configurations.
 
 ```java
 import com.minecraft.core.config.ConfigManager;
+import org.bukkit.configuration.file.FileConfiguration;
+import org.bukkit.configuration.file.YamlConfiguration;
 
-// Option 1: Using CoreAPI
-ConfigManager configManager = CoreAPI.getConfigManager();
-
-// Option 2: Create a config manager for your plugin
+// Create a config manager for your plugin
 ConfigManager configManager = new ConfigManager(yourPlugin);
 
 // Load the main config
@@ -470,11 +504,13 @@ YamlConfiguration customConfig = configManager.loadConfigFile("custom");
 // Access configuration values
 String value = config.getString("some.path", "default");
 boolean enabled = config.getBoolean("feature.enabled", false);
+
+// Save configuration
+configManager.saveConfig();
+configManager.saveConfigFile("custom");
 ```
 
 ### Using the Messages System
-
-The Messages system provides several constructors to accommodate different needs:
 
 ```java
 import com.minecraft.core.config.Messages;
@@ -528,17 +564,13 @@ LogUtil.warning("This is a warning message");
 LogUtil.severe("This is a severe error message");
 LogUtil.debug("This is a debug message (only shown if debug mode is enabled)");
 
-// Format string logging (new in v1.1.0)
+// Format string logging
 LogUtil.info("Player %s connected from %s", player.getName(), address);
 LogUtil.warning("Failed to load file: %s", fileName);
 LogUtil.severe("Exception in %s: %s", "TaskManager", e.getMessage());
 
 // Setting debug mode
-LogUtil.setDebugMode(true);  // Preferred method
-LogUtil.setDebugEnabled(true);  // Alternative method (added for compatibility)
-
-// Setting log level
-LogUtil.setLogLevel(Level.FINE);
+LogUtil.setDebugMode(true);
 
 // Per-plugin logging
 LogUtil.PluginLogger logger = LogUtil.forPlugin(yourPlugin, "[YourPlugin] ");
@@ -587,7 +619,7 @@ ItemStack head = InventoryUtil.createPlayerHead(player,
 // Make an item glow
 ItemStack glowing = InventoryUtil.makeGlow(item);
 
-// Create an inventory (new in v1.1.0)
+// Create an inventory
 Inventory inventory = InventoryUtil.createInventory(null, 54, "&8Example Inventory");
 
 // Fill inventory
@@ -611,7 +643,7 @@ Inventory confirmMenu = InventoryUtil.createConfirmationMenu(
     }
 );
 
-// Create a confirmation inventory with message (new in v1.1.0)
+// Create a confirmation inventory with message
 Inventory confirmInventory = InventoryUtil.createConfirmationInventory(
     "&8Confirm Delete",
     "&cAre you sure you want to delete this item?",
@@ -641,6 +673,9 @@ String yesNo = FormatUtil.formatBoolean(true); // "Yes"
 
 // Truncate text
 String truncated = FormatUtil.truncate("This is a long text", 10); // "This is a..."
+
+// Capitalize words
+String capitalized = FormatUtil.capitalizeWords("hello world"); // "Hello World"
 ```
 
 ### BungeeUtils
@@ -667,6 +702,17 @@ bungeeUtils.getServerNameAsync(serverName -> {
 bungeeUtils.getPlayerCount("survival", count -> {
     getLogger().info("Players on survival: " + count);
 });
+
+// Get player list on a server
+bungeeUtils.getPlayerList("survival", playerList -> {
+    getLogger().info("Players on survival: " + String.join(", ", playerList));
+});
+
+// Broadcast a plugin message
+bungeeUtils.broadcastPluginMessage("MyChannel", "Some message data");
+
+// Send a plugin message to a specific server
+bungeeUtils.sendPluginMessage("MyChannel", "lobby", "Some message data");
 ```
 
 ## Common Issues and Solutions
@@ -687,16 +733,7 @@ import org.bukkit.entity.Player;  // Import only one
 com.minecraft.example.sql.models.Player playerModel = new com.minecraft.example.sql.models.Player();
 ```
 
-Alternatively, you can use an import alias (Java 10+):
-
-```java
-import org.bukkit.entity.Player;
-import com.minecraft.example.sql.models.Player as ModelPlayer;
-
-ModelPlayer playerModel = new ModelPlayer();
-```
-
-In Java 8, consider renaming your model classes to avoid conflicts:
+Alternatively, consider renaming your model classes to avoid conflicts:
 
 ```java
 // Rename your model class
@@ -719,46 +756,34 @@ map.put("key1", "value1");
 map.put("key2", "value2");
 ```
 
-For immutable collections, use Guava or other libraries compatible with Java 8:
+### Dependency Issues
 
-```java
-// Using Guava
-import com.google.common.collect.ImmutableMap;
+If you're getting "cannot find symbol" errors for Core-Utils classes during compilation, check the following:
 
-Map<String, String> map = ImmutableMap.of("key1", "value1", "key2", "value2");
-```
+1. **Verify your plugin.yml** has the correct dependency:
+   ```yaml
+   depend: [CoreUtils]
+   ```
 
-### Method Signature Alternatives
+2. **Check your build script** is properly referencing Core-Utils:
+   - For multi-module projects: `compileOnly project(':Core-Utils')`
+   - For standalone projects: `compileOnly 'com.minecraft:core-utils:1.+'`
 
-Some methods have multiple overloads for flexibility:
+3. **Make sure Core-Utils is built first** if using a multi-module setup.
 
-```java
-// LogUtil has both simple and format string versions
-LogUtil.info("A simple message");
-LogUtil.info("Player %s joined from %s", playerName, address);
+4. **Check import statements** to ensure you're using the correct package paths:
+   ```java
+   import com.minecraft.core.api.CoreAPI;
+   import com.minecraft.core.utils.LogUtil;
+   import com.minecraft.core.command.annotation.Command;
+   ```
 
-// InventoryUtil has multiple ways to create items
-ItemStack item1 = InventoryUtil.createItem(Material.DIAMOND_SWORD, "&6Special Sword", "&7Very special");
-ItemStack item2 = InventoryUtil.createItem(Material.DIAMOND_SWORD, "&6Special Sword", Arrays.asList("&7Very special", "&8Rare"));
+5. **Verify Core-Utils is in the classpath** at runtime (installed as a plugin on your server).
 
-// Messages system offers multiple constructors
-Messages messages1 = new Messages(plugin);
-Messages messages2 = new Messages(plugin, messagesConfig);
-```
 
 ## Best Practices
 
-1. **Use CoreAPI**: Always use the CoreAPI class for accessing Core-Utils features. It provides a clean, centralized interface.
-
-```java
-// Instead of this:
-ServiceRegistry.register(YourService.class, yourService);
-
-// Use this:
-CoreAPI.Services.register(YourService.class, yourService);
-```
-
-2. **Check for Core-Utils**: Always verify that Core-Utils is available before using its features.
+1. **Check for Core-Utils**: Always verify that Core-Utils is available before using its features.
 
 ```java
 private boolean checkCoreUtils() {
@@ -772,10 +797,10 @@ private boolean checkCoreUtils() {
 }
 ```
 
-3. **Handle Missing Services**: Gracefully handle situations where a service isn't available.
+2. **Handle Missing Services**: Gracefully handle situations where a service isn't available.
 
 ```java
-AnotherService service = CoreAPI.Services.get(AnotherService.class);
+AnotherService service = ServiceLocator.getService(AnotherService.class);
 if (service == null) {
     // Fallback behavior or inform the user
     getLogger().warning("AnotherService is not available. Some features will be disabled.");
@@ -784,34 +809,125 @@ if (service == null) {
 }
 ```
 
-4. **Unregister Services**: Always unregister your services during your plugin's `onDisable()` method.
+3. **Unregister Services**: Always unregister your services during your plugin's `onDisable()` method.
 
-5. **Separate Interface and Implementation**: Define service interfaces in a separate package from their implementations.
+4. **Separate Interface and Implementation**: Define service interfaces in a separate package from their implementations.
 
-6. **Document Services**: Clearly document what your services do and what other plugins might need them.
+5. **Document Services**: Clearly document what your services do and what other plugins might need them.
 
-7. **Consistent Command Structure**: Use a consistent command structure across all your plugins.
+6. **Consistent Command Structure**: Use a consistent command structure across all your plugins.
 
-8. **Use Debug Mode Appropriately**: Use `LogUtil.debug()` for debugging information, not for regular logging.
+7. **Use Debug Mode Appropriately**: Use `LogUtil.debug()` for debugging information, not for regular logging.
 
-9. **Avoid Class Name Conflicts**: Use distinct class names or fully qualified names to avoid conflicts.
+8. **Avoid Class Name Conflicts**: Use distinct class names or fully qualified names to avoid conflicts.
 
-10. **Maintain Java 8 Compatibility**: Avoid using Java 9+ features to ensure compatibility with all servers.
+9. **Maintain Java 8 Compatibility**: Avoid using Java 9+ features to ensure compatibility with all servers.
 
 ## Example Plugin
 
-Refer to the Example Plugin for a complete implementation demonstrating all Core-Utils features.
-The Example Plugin includes:
+Here's a complete example of a simple plugin using Core-Utils:
 
-- Service registration and consumption
-- Command creation using annotations
-- Configuration management
-- Usage of various utility classes
+```java
+import com.minecraft.core.CorePlugin;
+import com.minecraft.core.api.service.ServiceRegistry;
+import com.minecraft.core.command.CommandRegistry;
+import com.minecraft.core.command.annotation.Command;
+import com.minecraft.core.command.annotation.SubCommand;
+import com.minecraft.core.utils.LogUtil;
 
-For a quick API usage reference, see the `ExampleApiUsage` class included with Core-Utils.
+import org.bukkit.ChatColor;
+import org.bukkit.command.CommandSender;
+import org.bukkit.plugin.Plugin;
+import org.bukkit.plugin.java.JavaPlugin;
 
-You can use this as a template for developing new plugins in the modular architecture.
+public class ExamplePlugin extends JavaPlugin {
+    
+    private ServiceRegistry serviceRegistry;
+    private CommandRegistry commandRegistry;
+    
+    @Override
+    public void onEnable() {
+        // Initialize logging
+        LogUtil.init(this);
+        
+        // Check for Core-Utils
+        Plugin corePlugin = getServer().getPluginManager().getPlugin("CoreUtils");
+        if (!(corePlugin instanceof CorePlugin)) {
+            LogUtil.severe("Core-Utils not found! This plugin requires Core-Utils to function.");
+            getServer().getPluginManager().disablePlugin(this);
+            return;
+        }
+        
+        CorePlugin core = (CorePlugin) corePlugin;
+        
+        // Get command registry
+        commandRegistry = core.getCommandRegistry();
+        
+        // Register commands
+        ExampleCommand command = new ExampleCommand(this);
+        commandRegistry.registerCommand(command);
+        
+        // Register services
+        ExampleService service = new DefaultExampleService(this);
+        ServiceRegistry.register(ExampleService.class, service);
+        
+        LogUtil.info("ExamplePlugin enabled successfully!");
+    }
+    
+    @Override
+    public void onDisable() {
+        // Unregister services
+        ServiceRegistry.unregister(ExampleService.class);
+        
+        LogUtil.info("ExamplePlugin disabled successfully!");
+    }
+    
+    // Command class
+    @Command(name = "example", description = "Example command")
+    public class ExampleCommand {
+        private final ExamplePlugin plugin;
+        
+        public ExampleCommand(ExamplePlugin plugin) {
+            this.plugin = plugin;
+        }
+        
+        @SubCommand(name = "help", description = "Show help")
+        public void helpCommand(CommandSender sender, String[] args) {
+            sender.sendMessage(ChatColor.GREEN + "Example Plugin Help");
+        }
+        
+        @SubCommand(isDefault = true, description = "Default command")
+        public void defaultCommand(CommandSender sender, String[] args) {
+            sender.sendMessage(ChatColor.GREEN + "This is the default command!");
+        }
+    }
+    
+    // Service interface
+    public interface ExampleService {
+        String performTask(String input);
+    }
+    
+    // Service implementation
+    public class DefaultExampleService implements ExampleService {
+        private final ExamplePlugin plugin;
+        
+        public DefaultExampleService(ExamplePlugin plugin) {
+            this.plugin = plugin;
+        }
+        
+        @Override
+        public String performTask(String input) {
+            return input.toUpperCase();
+        }
+    }
+}
+```
 
----
-
-For more information or assistance, contact the development team or refer to the source code documentation.
+This example demonstrates:
+- Initializing logging with LogUtil
+- Checking for Core-Utils
+- Registering commands with the CommandRegistry
+- Registering services with the ServiceRegistry
+- Creating a command class with @Command and @SubCommand annotations
+- Creating a service interface and implementation
+- Unregistering services on disable
