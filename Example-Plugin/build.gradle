@@ -1,0 +1,77 @@
+// ./build.gradle
+plugins {
+    id 'java'
+    id 'com.github.johnrengelman.shadow' version '7.1.2'
+}
+
+group = 'com.minecraft'
+version = '1.0.0'
+
+repositories {
+    mavenCentral()
+    
+    // Spigot repository
+    maven {
+        name = 'spigotmc-repo'
+        url = 'https://hub.spigotmc.org/nexus/content/repositories/snapshots/'
+    }
+    
+    // Sonatype repository
+    maven {
+        name = 'sonatype'
+        url = 'https://oss.sonatype.org/content/groups/public/'
+    }
+    
+    // Local Maven repository for Core-Utils and SQL-Bridge
+    mavenLocal()
+    
+    // Project repository (if using local builds)
+    maven {
+        name = 'projectRepo'
+        url = uri("${rootProject.projectDir}/../build/repo")
+    }
+}
+
+dependencies {
+    // Spigot API
+    compileOnly 'org.spigotmc:spigot-api:1.16.5-R0.1-SNAPSHOT'
+    
+    // Core-Utils dependency
+    compileOnly 'com.minecraft:core-utils:1.0.0'
+    
+    // SQL-Bridge dependency
+    compileOnly 'com.minecraft:sql-bridge:1.0.4'
+    
+    // Testing dependencies
+    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.8.1'
+    testImplementation 'org.mockito:mockito-core:4.0.0'
+    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.8.1'
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(8)
+    }
+}
+
+processResources {
+    def props = [version: version]
+    inputs.properties props
+    filteringCharset 'UTF-8'
+    
+    filesMatching('plugin.yml') {
+        expand props
+    }
+}
+
+shadowJar {
+    archiveClassifier.set('')
+}
+
+build {
+    dependsOn shadowJar
+}
+
+test {
+    useJUnitPlatform()
+}

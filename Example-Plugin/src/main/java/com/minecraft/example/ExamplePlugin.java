@@ -1,183 +1,205 @@
 // ./src/main/java/com/minecraft/example/ExamplePlugin.java
 package com.minecraft.example;
 
-import com.minecraft.core.api.CoreAPI;
+import com.minecraft.core.CorePlugin;
+import com.minecraft.core.api.service.ServiceRegistry;
+import com.minecraft.core.command.CommandRegistry;
 import com.minecraft.core.utils.LogUtil;
-import com.minecraft.example.command.AdminCommand;
-import com.minecraft.example.command.StatsCommand;
-import com.minecraft.example.database.StatsDAO;
+import com.minecraft.example.command.ExampleCommand;
+import com.minecraft.example.command.PlayerStatsCommand;
+import com.minecraft.example.config.ConfigManager;
 import com.minecraft.example.listener.PlayerListener;
 import com.minecraft.example.model.PlayerStats;
 import com.minecraft.example.service.DefaultStatsService;
 import com.minecraft.example.service.StatsService;
 import com.minecraft.sqlbridge.api.Database;
 import com.minecraft.sqlbridge.api.DatabaseService;
-import com.minecraft.sqlbridge.api.migration.Migration;
-import org.bukkit.configuration.file.FileConfiguration;
+import org.bukkit.Bukkit;
+import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.java.JavaPlugin;
 
-import java.sql.Connection;
 import java.sql.SQLException;
-import java.sql.Statement;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.logging.Level;
 
+/**
+ * Main class for Example-Plugin
+ * Demonstrates Core-Utils and SQL-Bridge functionality
+ */
 public class ExamplePlugin extends JavaPlugin {
     
-    private DatabaseService databaseService;
+    private ConfigManager configManager;
     private Database database;
-    private StatsDAO statsDAO;
-    private DefaultStatsService statsService;
+    private StatsService statsService;
     
     @Override
     public void onEnable() {
-        // Save default config
-        saveDefaultConfig();
-        
-        // Initialize Core-Utils logging
+        // Initialize LogUtil
         LogUtil.init(this);
-        LogUtil.setDebugMode(getConfig().getBoolean("debug", false));
-        LogUtil.info("Initializing Example Plugin...");
+        LogUtil.info("Initializing Example-Plugin...");
         
-        // Initialize database connection through SQL-Bridge
+        // Check for required plugins
+        if (!checkRequiredPlugins()) {
+            return;
+        }
+        
+        // Load configuration
+        configManager = new ConfigManager(this);
+        configManager.loadConfig();
+        
+        // Initialize database
         initializeDatabase();
         
-        // Initialize services
-        initializeServices();
+        // Register services
+        registerServices();
         
-        // Register commands using Core-Utils command framework
+        // Register commands
         registerCommands();
         
-        // Register event listeners
-        getServer().getPluginManager().registerEvents(new PlayerListener(this), this);
+        // Register listeners
+        registerListeners();
         
-        LogUtil.info("Example Plugin has been enabled!");
+        LogUtil.info("Example-Plugin enabled successfully!");
     }
     
     @Override
     public void onDisable() {
         // Unregister services
         if (statsService != null) {
-            CoreAPI.Services.unregister(StatsService.class);
+            ServiceRegistry.unregister(StatsService.class);
+            LogUtil.info("Unregistered StatsService");
         }
         
-        LogUtil.info("Example Plugin has been disabled.");
+        LogUtil.info("Example-Plugin disabled successfully!");
     }
     
+    /**
+     * Check if required plugins are available
+     * @return true if all required plugins are available
+     */
+    private boolean checkRequiredPlugins() {
+        // Check for Core-Utils
+        Plugin corePlugin = getServer().getPluginManager().getPlugin("CoreUtils");
+        if (!(corePlugin instanceof CorePlugin)) {
+            LogUtil.severe("Core-Utils not found! This plugin requires Core-Utils to function.");
+            getServer().getPluginManager().disablePlugin(this);
+            return false;
+        }
+        
+        // Check for SQL-Bridge
+        Plugin sqlPlugin = getServer().getPluginManager().getPlugin("SQL-Bridge");
+        if (sqlPlugin == null) {
+            LogUtil.severe("SQL-Bridge not found! This plugin requires SQL-Bridge to function.");
+            getServer().getPluginManager().disablePlugin(this);
+            return false;
+        }
+        
+        return true;
+    }
+    
+    /**
+     * Initialize database connection and tables
+     */
     private void initializeDatabase() {
         try {
-            // Get database service from SQL-Bridge (via Core-Utils service registry)
-            databaseService = CoreAPI.Services.get(DatabaseService.class);
-            
+            // Get database service from SQL-Bridge
+            DatabaseService databaseService = ServiceRegistry.getService(DatabaseService.class);
             if (databaseService == null) {
-                LogUtil.severe("Failed to get DatabaseService! Is SQL-Bridge enabled?");
+                LogUtil.severe("Could not find DatabaseService! Is SQL-Bridge enabled?");
                 getServer().getPluginManager().disablePlugin(this);
                 return;
             }
             
-            // Get a database instance for our plugin
+            // Get database connection for this plugin
             database = databaseService.getDatabaseForPlugin(this);
+            LogUtil.info("Database connection established");
             
-            // Register and run migrations
-            List<Migration> migrations = new ArrayList<>();
-            
-            // Migration to create initial tables
-            migrations.add(new Migration() {
-                @Override
-                public int getVersion() {
-                    return 1;
-                }
-                
-                @Override
-                public String getDescription() {
-                    return "Create player_stats table";
-                }
-                
-                @Override
-                public void migrate(Connection connection) throws SQLException {
-                    try (Statement stmt = connection.createStatement()) {
-                        stmt.execute(
-                            "CREATE TABLE IF NOT EXISTS player_stats (" +
-                            "  uuid VARCHAR(36) PRIMARY KEY, " +
-                            "  name VARCHAR(16) NOT NULL, " +
-                            "  first_join TIMESTAMP DEFAULT CURRENT_TIMESTAMP, " +
-                            "  last_join TIMESTAMP DEFAULT CURRENT_TIMESTAMP, " +
-                            "  playtime_seconds BIGINT DEFAULT 0, " +
-                            "  login_count INT DEFAULT 1, " +
-                            "  blocks_broken INT DEFAULT 0, " +
-                            "  blocks_placed INT DEFAULT 0" +
-                            ")"
-                        );
-                    }
-                }
-                
-                @Override
-                public void rollback(Connection connection) throws SQLException {
-                    try (Statement stmt = connection.createStatement()) {
-                        stmt.execute("DROP TABLE IF EXISTS player_stats");
-                    }
-                }
-            });
-            
-            // Register migrations with the database service
-            databaseService.registerMigrations(this, migrations);
-            
-            // Run migrations
-            int appliedMigrations = databaseService.runMigrationsSafe(this);
-            if (appliedMigrations > 0) {
-                LogUtil.info("Applied " + appliedMigrations + " database migrations.");
-            }
-            
-            // Initialize the DAO
-            statsDAO = new StatsDAO(database, this);
+            // Create tables
+            createTables();
             
         } catch (Exception e) {
             LogUtil.severe("Failed to initialize database: " + e.getMessage());
-            e.printStackTrace();
             getServer().getPluginManager().disablePlugin(this);
         }
     }
     
-    private void initializeServices() {
-        // Create and register our stats service
-        statsService = new DefaultStatsService(this, statsDAO);
-        CoreAPI.Services.register(StatsService.class, statsService);
-        LogUtil.info("Registered StatsService.");
-    }
-    
-    private void registerCommands() {
-        // Register commands using Core-Utils command framework
-        CoreAPI.Commands.register(new StatsCommand(this));
-        CoreAPI.Commands.register(new AdminCommand(this));
-        LogUtil.info("Registered commands.");
+    /**
+     * Create database tables
+     */
+    private void createTables() {
+        try {
+            // Create player_stats table if it doesn't exist
+            database.update(
+                "CREATE TABLE IF NOT EXISTS player_stats (" +
+                "  id INTEGER PRIMARY KEY AUTOINCREMENT, " +
+                "  uuid VARCHAR(36) NOT NULL UNIQUE, " +
+                "  name VARCHAR(16) NOT NULL, " +
+                "  kills INTEGER NOT NULL DEFAULT 0, " +
+                "  deaths INTEGER NOT NULL DEFAULT 0, " +
+                "  blocks_placed INTEGER NOT NULL DEFAULT 0, " +
+                "  blocks_broken INTEGER NOT NULL DEFAULT 0, " +
+                "  time_played INTEGER NOT NULL DEFAULT 0, " +
+                "  last_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP" +
+                ")"
+            );
+            
+            LogUtil.info("Database tables initialized");
+        } catch (SQLException e) {
+            LogUtil.severe("Failed to create tables: " + e.getMessage());
+        }
     }
     
     /**
-     * Reload the plugin configuration
+     * Register plugin services
      */
-    public void reloadPluginConfig() {
-        reloadConfig();
-        FileConfiguration config = getConfig();
-        
-        // Update debug mode
-        boolean debug = config.getBoolean("debug", false);
-        LogUtil.setDebugMode(debug);
-        LogUtil.info("Debug mode: " + (debug ? "enabled" : "disabled"));
-        
-        // Update other configuration options
-        // ...
+    private void registerServices() {
+        // Create and register StatsService
+        statsService = new DefaultStatsService(this, database);
+        ServiceRegistry.register(StatsService.class, statsService);
+        LogUtil.info("Registered StatsService");
     }
     
-    // Getter methods
+    /**
+     * Register plugin commands
+     */
+    private void registerCommands() {
+        // Get CorePlugin instance
+        CorePlugin corePlugin = (CorePlugin) getServer().getPluginManager().getPlugin("CoreUtils");
+        CommandRegistry commandRegistry = corePlugin.getCommandRegistry();
+        
+        // Register commands
+        commandRegistry.registerCommand(new ExampleCommand(this));
+        commandRegistry.registerCommand(new PlayerStatsCommand(this));
+        
+        LogUtil.info("Registered commands");
+    }
+    
+    /**
+     * Register event listeners
+     */
+    private void registerListeners() {
+        Bukkit.getPluginManager().registerEvents(new PlayerListener(this), this);
+        LogUtil.info("Registered event listeners");
+    }
+    
+    /**
+     * Get the configuration manager
+     * @return ConfigManager instance
+     */
+    public ConfigManager getConfigManager() {
+        return configManager;
+    }
+    
+    /**
+     * Get the database instance
+     * @return Database instance
+     */
     public Database getDatabase() {
         return database;
     }
     
-    public StatsDAO getStatsDAO() {
-        return statsDAO;
-    }
-    
+    /**
+     * Get the stats service
+     * @return StatsService instance
+     */
     public StatsService getStatsService() {
         return statsService;
     }

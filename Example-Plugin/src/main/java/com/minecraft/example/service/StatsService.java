@@ -2,86 +2,76 @@
 package com.minecraft.example.service;
 
 import com.minecraft.example.model.PlayerStats;
-import org.bukkit.entity.Player;
 
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
 
 /**
- * Service for managing player statistics
+ * Service interface for player statistics operations
+ * Demonstrates Core-Utils service registry pattern
  */
 public interface StatsService {
     
     /**
-     * Get player stats by UUID (synchronous)
-     * 
-     * @param uuid Player UUID
-     * @return Optional with player stats if found
+     * Get statistics for a player
+     * @param playerUuid Player UUID
+     * @return Optional containing PlayerStats if found
      */
-    Optional<PlayerStats> getPlayerStats(UUID uuid);
+    Optional<PlayerStats> getPlayerStats(UUID playerUuid);
     
     /**
-     * Get player stats by UUID (asynchronous)
-     * 
-     * @param uuid Player UUID
-     * @return CompletableFuture with Optional player stats
+     * Save player statistics
+     * @param stats PlayerStats to save
+     * @return true if successful
      */
-    CompletableFuture<Optional<PlayerStats>> getPlayerStatsAsync(UUID uuid);
+    boolean savePlayerStats(PlayerStats stats);
     
     /**
-     * Get player stats by name (synchronous)
-     * 
-     * @param name Player name
-     * @return Optional with player stats if found
+     * Get statistics for a player by name
+     * @param playerName Player name
+     * @return Optional containing PlayerStats if found
      */
-    Optional<PlayerStats> getPlayerStatsByName(String name);
+    Optional<PlayerStats> getPlayerStatsByName(String playerName);
     
     /**
-     * Get top players for a specific stat
-     * 
-     * @param statField The name of the field to sort by (playtime_seconds, blocks_broken, etc.)
+     * Update a specific statistic for a player
+     * @param playerUuid Player UUID
+     * @param statName Name of the statistic to update
+     * @param value New value
+     * @return true if successful
+     */
+    boolean updateStat(UUID playerUuid, String statName, int value);
+    
+    /**
+     * Increment a specific statistic for a player
+     * @param playerUuid Player UUID
+     * @param statName Name of the statistic to increment
+     * @return true if successful
+     */
+    boolean incrementStat(UUID playerUuid, String statName);
+    
+    /**
+     * Get top players for a specific statistic
+     * @param statName Name of the statistic to rank by
      * @param limit Maximum number of players to return
-     * @return List of player stats ordered by the specified stat
+     * @return List of PlayerStats ordered by the specified statistic
      */
-    List<PlayerStats> getTopPlayers(String statField, int limit);
+    List<PlayerStats> getTopPlayers(String statName, int limit);
     
     /**
-     * Create or update player stats when a player joins
-     * 
-     * @param player The player who joined
+     * Reset a player's statistics
+     * @param playerUuid Player UUID
+     * @return true if successful
      */
-    void recordPlayerJoin(Player player);
+    boolean resetStats(UUID playerUuid);
     
     /**
-     * Update player playtime when a player quits
-     * 
-     * @param player The player who quit
-     * @param sessionSeconds The length of the player's session in seconds
+     * Update player's time played
+     * Uses a transaction to ensure atomicity
+     * @param playerUuid Player UUID
+     * @param additionalSeconds Seconds to add to time played
+     * @return true if successful
      */
-    void updatePlaytime(Player player, long sessionSeconds);
-    
-    /**
-     * Increment the blocks broken counter for a player
-     * 
-     * @param player The player who broke a block
-     */
-    void incrementBlocksBroken(Player player);
-    
-    /**
-     * Increment the blocks placed counter for a player
-     * 
-     * @param player The player who placed a block
-     */
-    void incrementBlocksPlaced(Player player);
-    
-    /**
-     * Reset a specific stat for a player
-     * 
-     * @param uuid Player UUID
-     * @param statField The name of the field to reset
-     * @return true if successful, false otherwise
-     */
-    boolean resetStat(UUID uuid, String statField);
+    boolean updateTimePlayed(UUID playerUuid, int additionalSeconds);
 }

@@ -1,0 +1,46 @@
+# ./src/main/resources/config.yml
+# Example-Plugin Configuration
+
+# Debug mode (enables additional logging)
+debug: false
+
+# Database configuration
+# Note: This is not used directly since we use SQL-Bridge's database
+# This is just to showcase configurable options
+database:
+  # Database type: MYSQL, SQLITE
+  type: SQLITE
+  
+  # MySQL settings (if type is MYSQL)
+  mysql:
+    host: localhost
+    port: 3306
+    database: example_plugin
+    username: root
+    password: password
+  
+  # SQLite settings (if type is SQLITE)
+  sqlite:
+    file: example_plugin.db
+
+# Tracking settings
+tracking:
+  # Whether to track player kills
+  kills: true
+  
+  # Whether to track player deaths
+  deaths: true
+  
+  # Whether to track block placement and breaking
+  blocks: true
+  
+  # Whether to track time played
+  time_played: true
+
+# Top players command settings
+top_players:
+  # Default number of players to show
+  default_limit: 5
+  
+  # Maximum number of players to show
+  max_limit: 20

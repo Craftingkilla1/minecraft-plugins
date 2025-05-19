@@ -1,0 +1,56 @@
+# ./src/main/resources/plugin.yml
+name: Example-Plugin
+version: '${version}'
+main: com.minecraft.example.ExamplePlugin
+api-version: '1.16'
+description: Example plugin demonstrating Core-Utils and SQL-Bridge functionality
+author: MinecraftDev
+website: https://github.com/Craftingkilla1/minecraft-plugins
+
+# Dependencies
+depend: [CoreUtils, SQL-Bridge]
+
+# Commands (These are still needed in plugin.yml even with annotation-based commands)
+commands:
+  example:
+    description: Example plugin commands
+    aliases: [ex]
+    usage: /example <help|info|services|reload|debug>
+  
+  playerstats:
+    description: View and manage player statistics
+    aliases: [pstats]
+    usage: /playerstats [view <player>|top <stat> [limit]|reset]
+
+# Permissions
+permissions:
+  exampleplugin.*:
+    description: Grants all Example-Plugin permissions
+    default: op
+    children:
+      exampleplugin.reload: true
+      exampleplugin.debug: true
+      exampleplugin.stats.*: true
+  
+  exampleplugin.reload:
+    description: Allows reloading the plugin configuration
+    default: op
+  
+  exampleplugin.debug:
+    description: Allows toggling debug mode
+    default: op
+  
+  exampleplugin.stats.*:
+    description: Grants all player stats permissions
+    default: op
+    children:
+      exampleplugin.stats.reset: true
+      exampleplugin.stats.adminreset: true
+  
+  exampleplugin.stats.reset:
+    description: Allows resetting your own statistics
+    default: true
+  
+  exampleplugin.stats.adminreset:
+    description: Allows resetting another player's statistics
+    default: op

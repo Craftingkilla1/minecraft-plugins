@@ -1,0 +1,43 @@
+# ./src/main/resources/messages.yml
+# Example-Plugin Messages
+
+# General messages
+general:
+  prefix: "&8[&bExample&8] &r"
+  no_permission: "&cYou don't have permission to use this command."
+  players_only: "&cThis command can only be used by players."
+  command_usage: "&cUsage: {0}"
+  plugin_reload: "&aExample Plugin configuration reloaded!"
+  debug_enabled: "&aDebug mode enabled!"
+  debug_disabled: "&aDebug mode disabled!"
+
+# Player stats messages
+stats:
+  # Header for stats display
+  header: "&a=== Statistics for {player} ==="
+  
+  # Format for individual stats
+  kills: "&eKills: &f{kills}"
+  deaths: "&eDeaths: &f{deaths}"
+  kd_ratio: "&eK/D Ratio: &f{kd_ratio}"
+  blocks_placed: "&eBlocks Placed: &f{blocks_placed}"
+  blocks_broken: "&eBlocks Broken: &f{blocks_broken}"
+  time_played: "&eTime Played: &f{time_played}"
+  last_seen: "&eLast Seen: &f{last_seen}"
+  
+  # No stats message
+  no_stats: "&cYou don't have any statistics yet."
+  player_no_stats: "&cPlayer {player} has no statistics."
+  player_not_found: "&cPlayer {player} not found."
+  
+  # Top players messages
+  top_header: "&a=== Top {limit} Players by {stat} ==="
+  top_format: "&e{position}. &f{player} &7- &6{value}"
+  no_top_stats: "&cNo player statistics found."
+  invalid_stat: "&cInvalid statistic. Valid options: kills, deaths, blocksPlaced, blocksBroken, timePlayed"
+  
+  # Reset messages
+  reset_success: "&aYour statistics have been reset."
+  reset_failed: "&cFailed to reset your statistics."
+  admin_reset_success: "&aReset statistics for player {player}."
+  admin_reset_failed: "&cFailed to reset statistics for player {player}."

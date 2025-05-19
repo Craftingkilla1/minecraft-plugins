@@ -3,7 +3,7 @@ package com.minecraft.example.listener;
 
 import com.minecraft.core.utils.LogUtil;
 import com.minecraft.example.ExamplePlugin;
-import com.minecraft.example.service.DefaultStatsService;
+import com.minecraft.example.model.PlayerStats;
 import com.minecraft.example.service.StatsService;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -11,76 +11,130 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
+import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Optional;
+import java.util.UUID;
+
 /**
- * Listener for player-related events
+ * Event listener for tracking player statistics
  */
 public class PlayerListener implements Listener {
     
     private final ExamplePlugin plugin;
     private final StatsService statsService;
     
+    // Track join times for calculating time played
+    private final Map<UUID, Long> joinTimes = new HashMap<>();
+    
+    /**
+     * Constructor
+     * @param plugin Plugin instance
+     */
     public PlayerListener(ExamplePlugin plugin) {
         this.plugin = plugin;
         this.statsService = plugin.getStatsService();
     }
     
+    /**
+     * Handle player join event
+     * @param event PlayerJoinEvent
+     */
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onPlayerJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();
+        UUID playerUuid = player.getUniqueId();
         
-        // Record player join
-        statsService.recordPlayerJoin(player);
+        // Record join time for tracking time played
+        joinTimes.put(playerUuid, System.currentTimeMillis());
         
-        LogUtil.debug("Recorded join for player: " + player.getName());
-    }
-    
-    @EventHandler(priority = EventPriority.MONITOR)
-    public void onPlayerQuit(PlayerQuitEvent event) {
-        Player player = event.getPlayer();
+        // Get player stats
+        Optional<PlayerStats> statsOptional = statsService.getPlayerStats(playerUuid);
         
-        // Calculate session length and update playtime
-        if (statsService instanceof DefaultStatsService) {
-            DefaultStatsService defaultService = (DefaultStatsService) statsService;
-            long sessionSeconds = defaultService.calculateSessionLength(player);
-            
-            if (sessionSeconds > 0) {
-                // Update playtime
-                statsService.updatePlaytime(player, sessionSeconds);
-                LogUtil.debug("Updated playtime for " + player.getName() + ": +" + sessionSeconds + " seconds");
+        if (!statsOptional.isPresent()) {
+            // Create new player stats
+            PlayerStats stats = new PlayerStats(playerUuid, player.getName());
+            statsService.savePlayerStats(stats);
+            LogUtil.debug("Created new player stats for " + player.getName());
+        } else {
+            // Update player name if changed
+            PlayerStats stats = statsOptional.get();
+            if (!stats.getPlayerName().equals(player.getName())) {
+                stats.setPlayerName(player.getName());
+                statsService.savePlayerStats(stats);
+                LogUtil.debug("Updated player name for " + player.getName());
             }
         }
     }
     
-    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
-    public void onBlockBreak(BlockBreakEvent event) {
-        // Check if tracking is enabled in config
-        if (!plugin.getConfig().getBoolean("track.blocks_broken", true)) {
-            return;
-        }
-        
+    /**
+     * Handle player quit event
+     * @param event PlayerQuitEvent
+     */
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onPlayerQuit(PlayerQuitEvent event) {
         Player player = event.getPlayer();
+        UUID playerUuid = player.getUniqueId();
         
-        // Run async to not impact server performance
-        plugin.getServer().getScheduler().runTaskAsynchronously(plugin, () -> {
-            statsService.incrementBlocksBroken(player);
-        });
+        // Calculate time played
+        if (joinTimes.containsKey(playerUuid)) {
+            long joinTime = joinTimes.get(playerUuid);
+            long quitTime = System.currentTimeMillis();
+            int sessionSeconds = (int) ((quitTime - joinTime) / 1000);
+            
+            // Update time played
+            statsService.updateTimePlayed(playerUuid, sessionSeconds);
+            
+            // Remove from join times map
+            joinTimes.remove(playerUuid);
+            
+            LogUtil.debug("Updated time played for " + player.getName() + ": +" + sessionSeconds + " seconds");
+        }
     }
     
+    /**
+     * Handle player death event
+     * @param event PlayerDeathEvent
+     */
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onPlayerDeath(PlayerDeathEvent event) {
+        Player player = event.getEntity();
+        
+        // Increment death count
+        statsService.incrementStat(player.getUniqueId(), "deaths");
+        
+        // Increment kill count for killer (if killed by a player)
+        Player killer = player.getKiller();
+        if (killer != null) {
+            statsService.incrementStat(killer.getUniqueId(), "kills");
+        }
+    }
+    
+    /**
+     * Handle block place event
+     * @param event BlockPlaceEvent
+     */
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onBlockPlace(BlockPlaceEvent event) {
-        // Check if tracking is enabled in config
-        if (!plugin.getConfig().getBoolean("track.blocks_placed", true)) {
-            return;
-        }
-        
         Player player = event.getPlayer();
         
-        // Run async to not impact server performance
-        plugin.getServer().getScheduler().runTaskAsynchronously(plugin, () -> {
-            statsService.incrementBlocksPlaced(player);
-        });
+        // Increment blocks placed count
+        statsService.incrementStat(player.getUniqueId(), "blocks_placed");
+    }
+    
+    /**
+     * Handle block break event
+     * @param event BlockBreakEvent
+     */
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onBlockBreak(BlockBreakEvent event) {
+        Player player = event.getPlayer();
+        
+        // Increment blocks broken count
+        statsService.incrementStat(player.getUniqueId(), "blocks_broken");
     }
 }
